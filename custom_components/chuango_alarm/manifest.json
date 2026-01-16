@@ -1,0 +1,9 @@
+{
+  "domain": "chuango_alarm",
+  "name": "Chuango Alarm",
+  "version": "0.1.0",
+  "config_flow": true,
+  "documentation": "https://github.com/NemoN/ha-chuango-ov300",
+  "iot_class": "cloud_polling",
+  "platforms": ["sensor"]
+}

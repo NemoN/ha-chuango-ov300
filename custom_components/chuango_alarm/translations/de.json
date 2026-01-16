@@ -1,0 +1,23 @@
+{
+  "title": "Chuango Alarm",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Login",
+        "description": "Gib deine 'DreamCatcher Live' Zugangsdaten ein:",
+        "data": {
+          "country_code": "Ländervorwahl",
+          "email": "E-Mail",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Login fehlgeschlagen.",
+      "cannot_connect": "Verbindung fehlgeschlagen."
+    },
+    "abort": {
+      "already_configured": "Integration bereits eingerichtet."
+    }
+  }
+}

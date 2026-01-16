@@ -1,0 +1,23 @@
+{
+  "title": "Chuango Alarm",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Login",
+        "description": "Please enter your 'DreamCatcher Live' credentials:",
+        "data": {
+          "country_code": "Country code",
+          "email": "E-Mail",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid login.",
+      "cannot_connect": "Connection failed."
+    },
+    "abort": {
+      "already_configured": "Integration already configured."
+    }
+  }
+}
