@@ -6,7 +6,7 @@
         "title": "Login",
         "description": "Gib deine 'DreamCatcher Live' Zugangsdaten ein:",
         "data": {
-          "country_code": "Ländervorwahl",
+          "region": "Land",
           "email": "E-Mail",
           "password": "Passwort"
         }
@@ -14,7 +14,8 @@
     },
     "error": {
       "invalid_auth": "Login fehlgeschlagen.",
-      "cannot_connect": "Verbindung fehlgeschlagen."
+      "cannot_connect": "Verbindung fehlgeschlagen.",
+      "invalid_region": "Ungültige Länderauswahl."
     },
     "abort": {
       "already_configured": "Integration bereits eingerichtet."

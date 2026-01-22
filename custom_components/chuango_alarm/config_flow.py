@@ -11,18 +11,27 @@ from homeassistant.helpers import selector
 
 from .api import DreamcatcherApiClient, DreamcatcherAuthError, DreamcatcherError
 from .const import (
-    DOMAIN,
+    CONF_AM_DOMAIN,
+    CONF_AM_IP,
+    CONF_AM_PORT,
     CONF_COUNTRY_CODE,
+    CONF_COUNTRY_NAME,
     CONF_EMAIL,
-    CONF_PASSWORD,
-    DEFAULT_COUNTRY_CODE,
-    DEFAULT_OS,
-    DEFAULT_OS_VER,
+    CONF_PASSWORD_MD5,
+    CONF_MQTT_DOMAIN,
+    CONF_MQTT_IP,
+    CONF_MQTT_PORT,
+    CONF_REGION,
+    CONF_UUID,
+    DOMAIN,
     DEFAULT_APP,
     DEFAULT_APP_VER,
-    DEFAULT_PHONE_BRAND,
     DEFAULT_LANG,
+    DEFAULT_OS,
+    DEFAULT_OS_VER,
+    DEFAULT_PHONE_BRAND,
 )
+from .countries_data import COUNTRIES, LOCALE_TO_COUNTRY
 from .utils import generate_vendor_uuid, md5_hex, looks_like_md5
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,65 +43,111 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
 
-        if user_input is not None:
-            country_code = user_input[CONF_COUNTRY_CODE].strip()
-            email = user_input[CONF_EMAIL].strip()
+        countries = COUNTRIES
 
-            pw_raw = user_input[CONF_PASSWORD].strip()
-            password_md5 = pw_raw if looks_like_md5(pw_raw) else md5_hex(pw_raw)
+        def _valid_locale(loc: str | None) -> bool:
+            if not loc:
+                return False
+            loc = str(loc).strip()
+            return len(loc) == 2 and loc.isalpha() and loc.isupper()
 
-            uuid = generate_vendor_uuid()
+        options = [
+            selector.SelectOptionDict(
+                value=str(c["locale"]),
+                label=f"{c['en']} (+{c['code']})",
+            )
+            for c in countries
+            if _valid_locale(c.get("locale")) and c.get("en") and c.get("code")
+        ]
 
-            session = async_get_clientsession(self.hass)
-            api = DreamcatcherApiClient(session=session, logger=_LOGGER)
-
-            try:
-                res = await api.login(
-                    country_code=country_code,
-                    email=email,
-                    password_md5=password_md5,
-                    uuid=uuid,
-                    os=DEFAULT_OS,
-                    os_ver=DEFAULT_OS_VER,
-                    app=DEFAULT_APP,
-                    app_ver=DEFAULT_APP_VER,
-                    phone_brand=DEFAULT_PHONE_BRAND,
-                    lang=DEFAULT_LANG,
-                )
-            except DreamcatcherAuthError:
-                errors["base"] = "invalid_auth"
-            except DreamcatcherError:
-                errors["base"] = "cannot_connect"
-            else:
-                user_id = str(res.user_info.get("userId", ""))
-                alias = str(res.user_info.get("alias", "")) or email
-
-                await self.async_set_unique_id(user_id or email)
-                self._abort_if_unique_id_configured()
-
-                data = {
-                    "country_code": country_code,
-                    "email": email,
-                    "password_md5": password_md5,
-                    "uuid": uuid,
-                    "os": DEFAULT_OS,
-                    "os_ver": DEFAULT_OS_VER,
-                    "app": DEFAULT_APP,
-                    "app_ver": DEFAULT_APP_VER,
-                    "phone_brand": DEFAULT_PHONE_BRAND,
-                    "lang": DEFAULT_LANG,
-                }
-
-                return self.async_create_entry(title=alias, data=data)
+        default_region = "DE" if any(str(c.get("locale")) == "DE" for c in countries) else None
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_COUNTRY_CODE, default=DEFAULT_COUNTRY_CODE): str,
+                vol.Required(CONF_REGION, default=default_region): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        sort=True,
+                    )
+                ),
                 vol.Required(CONF_EMAIL): str,
-                vol.Required(CONF_PASSWORD): selector.TextSelector(
+                vol.Required("password"): selector.TextSelector(
                     selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
                 ),
             }
         )
 
-        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+        if user_input is None:
+            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+        region = str(user_input[CONF_REGION]).strip()
+        email = str(user_input[CONF_EMAIL]).strip()
+        pw_raw = str(user_input["password"]).strip()
+
+        country = LOCALE_TO_COUNTRY.get(region)
+        if not country:
+            errors["base"] = "invalid_region"
+            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+        country_name = str(country.get("en") or region)
+        country_code = f"+{country['code']}"
+
+        password_md5 = pw_raw if looks_like_md5(pw_raw) else md5_hex(pw_raw)
+        uuid = getattr(self, "_vendor_uuid", None) or generate_vendor_uuid()
+        self._vendor_uuid = uuid
+
+        session = async_get_clientsession(self.hass)
+        api = DreamcatcherApiClient(session=session, logger=_LOGGER)
+
+        try:
+            zone = await api.get_zone(region=region, lang=DEFAULT_LANG)
+            res = await api.login(
+                am_domain=zone.am_domain,
+                am_port=zone.am_port,
+                country_code=country_code,
+                email=email,
+                password_md5=password_md5,
+                uuid=uuid,
+                os=DEFAULT_OS,
+                os_ver=DEFAULT_OS_VER,
+                app=DEFAULT_APP,
+                app_ver=DEFAULT_APP_VER,
+                phone_brand=DEFAULT_PHONE_BRAND,
+                lang=DEFAULT_LANG,
+            )
+        except DreamcatcherAuthError:
+            errors["base"] = "invalid_auth"
+            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+        except DreamcatcherError:
+            errors["base"] = "cannot_connect"
+            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+        user_id = str(res.user_info.get("userId", ""))
+        alias = str(res.user_info.get("alias", "")) or email
+
+        await self.async_set_unique_id(user_id or email)
+        self._abort_if_unique_id_configured()
+
+        data = {
+            CONF_REGION: region,
+            CONF_COUNTRY_NAME: country_name,
+            CONF_COUNTRY_CODE: country_code,
+            CONF_EMAIL: email,
+            CONF_PASSWORD_MD5: password_md5,
+            CONF_UUID: uuid,
+            "os": DEFAULT_OS,
+            "os_ver": DEFAULT_OS_VER,
+            "app": DEFAULT_APP,
+            "app_ver": DEFAULT_APP_VER,
+            "phone_brand": DEFAULT_PHONE_BRAND,
+            "lang": DEFAULT_LANG,
+            CONF_AM_DOMAIN: zone.am_domain,
+            CONF_AM_IP: zone.am_ip,
+            CONF_AM_PORT: zone.am_port,
+            CONF_MQTT_DOMAIN: zone.mqtt_domain,
+            CONF_MQTT_IP: zone.mqtt_ip,
+            CONF_MQTT_PORT: zone.mqtt_port,
+        }
+
+        return self.async_create_entry(title=alias, data=data)

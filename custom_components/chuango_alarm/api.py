@@ -9,7 +9,6 @@ from typing import Any
 import aiohttp
 
 from .const import (
-    API_BASE,
     DEFAULT_APP,
     DEFAULT_APP_VER,
     DEFAULT_BRAND_HEADER,
@@ -19,18 +18,23 @@ from .const import (
     DEFAULT_PHONE_BRAND,
     DEFAULT_USER_AGENT,
     LOGIN_PATH,
+    ZONE_API_BASE,
+    ZONE_PATH,
 )
+from .http_log import pretty_json, redact_headers, redact_mapping, truncate
 
-from .http_log import redact_headers, redact_mapping, pretty_json, truncate
 
 class DreamcatcherError(Exception):
     pass
 
+
 class DreamcatcherAuthError(DreamcatcherError):
     pass
 
+
 class DreamcatcherApiError(DreamcatcherError):
     pass
+
 
 @dataclass
 class LoginResult:
@@ -38,13 +42,96 @@ class LoginResult:
     expire_at: int
     user_info: dict[str, Any]
 
+
+@dataclass
+class ZoneResult:
+    region: str
+    am_domain: str
+    am_ip: str
+    am_port: int
+    mqtt_domain: str
+    mqtt_ip: str
+    mqtt_port: int
+
+
 class DreamcatcherApiClient:
     def __init__(self, session: aiohttp.ClientSession, logger: logging.Logger) -> None:
         self._session = session
         self._log = logger
 
+    async def get_zone(self, region: str, lang: str = DEFAULT_LANG) -> ZoneResult:
+        url = f"{ZONE_API_BASE}{ZONE_PATH}"
+
+        params = {"region": region}
+
+        headers = {
+            "Appversion": DEFAULT_APP_VER,
+            "Platform": DEFAULT_OS,
+            "Lang": lang,
+            "Brand": DEFAULT_BRAND_HEADER,
+            "User-Agent": DEFAULT_USER_AGENT,
+        }
+
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(
+                "HTTP REQUEST %s %s\nparams=%s\nheaders=%s",
+                "GET",
+                url,
+                pretty_json(redact_mapping(params)),
+                pretty_json(redact_headers(headers)),
+            )
+
+        try:
+            async with asyncio.timeout(20):
+                resp = await self._session.get(url, params=params, headers=headers)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise DreamcatcherApiError(f"Zone connection error: {err}") from err
+
+        async with resp:
+            body_bytes = await resp.read()
+            body_text = body_bytes.decode("utf-8", errors="replace")
+
+            if self._log.isEnabledFor(logging.DEBUG):
+                self._log.debug(
+                    "HTTP RESPONSE %s %s\nstatus=%s\nresp_headers=%s\nbody=%s",
+                    "GET",
+                    str(resp.url),
+                    resp.status,
+                    pretty_json(redact_headers(dict(resp.headers))),
+                    truncate(body_text),
+                )
+
+            if resp.status != 200:
+                raise DreamcatcherApiError(f"Zone HTTP {resp.status}: {truncate(body_text, 300)}")
+
+            try:
+                data = json.loads(body_text)
+            except Exception as err:
+                raise DreamcatcherApiError(
+                    f"Zone invalid JSON: {err} | body={truncate(body_text, 300)}"
+                ) from err
+
+        am = data.get("am") or {}
+        mqtt = data.get("mqtt") or {}
+
+        try:
+            return ZoneResult(
+                region=str(data.get("region") or region),
+                am_domain=str(am["domain"]),
+                am_ip=str(am.get("ip") or ""),
+                am_port=int(am["port"]),
+                mqtt_domain=str(mqtt["domain"]),
+                mqtt_ip=str(mqtt.get("ip") or ""),
+                mqtt_port=int(mqtt["port"]),
+            )
+        except Exception as err:
+            raise DreamcatcherApiError(f"Unexpected zone response shape: {truncate(pretty_json(data), 800)}") from err
+
     async def login(
         self,
+        *,
+        am_domain: str,
+        am_port: int,
         country_code: str,
         email: str,
         password_md5: str,
@@ -56,7 +143,7 @@ class DreamcatcherApiClient:
         phone_brand: str = DEFAULT_PHONE_BRAND,
         lang: str = DEFAULT_LANG,
     ) -> LoginResult:
-        url = f"{API_BASE}{LOGIN_PATH}"
+        url = f"https://{am_domain}:{am_port}{LOGIN_PATH}"
 
         params = {
             "countryCode": country_code,
@@ -76,10 +163,7 @@ class DreamcatcherApiClient:
             "Platform": os,
             "Lang": lang,
             "Brand": DEFAULT_BRAND_HEADER,
-            "TE": "gzip, deflate; q=0.5",
             "User-Agent": DEFAULT_USER_AGENT,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
         }
 
         if self._log.isEnabledFor(logging.DEBUG):
@@ -90,12 +174,12 @@ class DreamcatcherApiClient:
                 pretty_json(redact_mapping(params)),
                 pretty_json(redact_headers(headers)),
             )
-        
+
         try:
             async with asyncio.timeout(20):
                 resp = await self._session.get(url, params=params, headers=headers)
         except (aiohttp.ClientError, TimeoutError) as err:
-            raise DreamcatcherApiError(f"Connection error: {err}") from err
+            raise DreamcatcherApiError(f"Login connection error: {err}") from err
 
         async with resp:
             body_bytes = await resp.read()

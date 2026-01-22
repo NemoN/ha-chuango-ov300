@@ -9,7 +9,15 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import DreamcatcherApiClient, DreamcatcherAuthError, DreamcatcherError
-from .const import DOMAIN
+from .const import (
+    CONF_AM_DOMAIN,
+    CONF_AM_PORT,
+    CONF_COUNTRY_CODE,
+    CONF_EMAIL,
+    CONF_PASSWORD_MD5,
+    CONF_UUID,
+    DOMAIN,
+)
 
 
 class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -34,16 +42,18 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         try:
             res = await self.api.login(
-                country_code=self.entry_data["country_code"],
-                email=self.entry_data["email"],
-                password_md5=self.entry_data["password_md5"],
-                uuid=self.entry_data["uuid"],
-                os=self.entry_data["os"],
-                os_ver=self.entry_data["os_ver"],
-                app=self.entry_data["app"],
-                app_ver=self.entry_data["app_ver"],
-                phone_brand=self.entry_data["phone_brand"],
-                lang=self.entry_data["lang"],
+                am_domain=self.entry_data[CONF_AM_DOMAIN],
+                am_port=int(self.entry_data[CONF_AM_PORT]),
+                country_code=self.entry_data[CONF_COUNTRY_CODE],
+                email=self.entry_data[CONF_EMAIL],
+                password_md5=self.entry_data[CONF_PASSWORD_MD5],
+                uuid=self.entry_data[CONF_UUID],
+                os=self.entry_data.get("os"),
+                os_ver=self.entry_data.get("os_ver"),
+                app=self.entry_data.get("app"),
+                app_ver=self.entry_data.get("app_ver"),
+                phone_brand=self.entry_data.get("phone_brand"),
+                lang=self.entry_data.get("lang"),
             )
         except DreamcatcherAuthError as err:
             raise UpdateFailed(f"Authentication failed: {err}") from err
