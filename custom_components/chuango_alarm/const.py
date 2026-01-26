@@ -8,7 +8,7 @@ ZONE_PATH = "/v2/server/zone"
 
 # API paths (resolved via zone 'am' endpoint)
 LOGIN_PATH = "/v2/user/login"
-HOMES_PATH = "/v2/group/homes"
+SHARED_DEVICES_PATH = "/v2/user/device/list/shared"
 
 CONF_REGION = "region"              # e.g. 'DE'
 CONF_COUNTRY_NAME = "country_name"  # e.g. 'Germany'
@@ -17,6 +17,10 @@ CONF_COUNTRY_CODE = "country_code"  # e.g. '+49'
 CONF_EMAIL = "email"
 CONF_PASSWORD_MD5 = "password_md5"
 CONF_UUID = "uuid"
+CONF_TOKEN = "token"
+CONF_EXPIRE_AT = "expireAt"
+CONF_LAST_LOGIN = "lastLogin"
+CONF_USER_INFO = "userInfo"
 
 # Resolved endpoints from zone lookup
 CONF_AM_DOMAIN = "am_domain"
@@ -39,4 +43,4 @@ DEFAULT_USER_AGENT = (
     "Dalvik/2.1.0 (Linux; U; Android 10; Android SDK built for arm64 Build/QSR1.211112.010)"
 )
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.ALARM_CONTROL_PANEL]

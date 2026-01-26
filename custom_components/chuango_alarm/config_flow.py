@@ -24,12 +24,6 @@ from .const import (
     CONF_REGION,
     CONF_UUID,
     DOMAIN,
-    DEFAULT_APP,
-    DEFAULT_APP_VER,
-    DEFAULT_LANG,
-    DEFAULT_OS,
-    DEFAULT_OS_VER,
-    DEFAULT_PHONE_BRAND,
 )
 from .countries_data import COUNTRIES, LOCALE_TO_COUNTRY
 from .utils import generate_vendor_uuid, md5_hex, looks_like_md5
@@ -101,7 +95,10 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         api = DreamcatcherApiClient(session=session, logger=_LOGGER)
 
         try:
-            zone = await api.get_zone(region=region, lang=DEFAULT_LANG)
+            zone = await api.get_zone(
+                region=region
+            )
+
             res = await api.login(
                 am_domain=zone.am_domain,
                 am_port=zone.am_port,
@@ -109,12 +106,6 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 email=email,
                 password_md5=password_md5,
                 uuid=uuid,
-                os=DEFAULT_OS,
-                os_ver=DEFAULT_OS_VER,
-                app=DEFAULT_APP,
-                app_ver=DEFAULT_APP_VER,
-                phone_brand=DEFAULT_PHONE_BRAND,
-                lang=DEFAULT_LANG,
             )
         except DreamcatcherAuthError:
             errors["base"] = "invalid_auth"
@@ -136,12 +127,6 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_EMAIL: email,
             CONF_PASSWORD_MD5: password_md5,
             CONF_UUID: uuid,
-            "os": DEFAULT_OS,
-            "os_ver": DEFAULT_OS_VER,
-            "app": DEFAULT_APP,
-            "app_ver": DEFAULT_APP_VER,
-            "phone_brand": DEFAULT_PHONE_BRAND,
-            "lang": DEFAULT_LANG,
             CONF_AM_DOMAIN: zone.am_domain,
             CONF_AM_IP: zone.am_ip,
             CONF_AM_PORT: zone.am_port,
