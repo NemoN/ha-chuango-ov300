@@ -1,10 +1,15 @@
 {
   "domain": "chuango_alarm",
   "name": "Chuango Alarm",
-  "version": "0.1.2",
+  "codeowners": [
+    "@NemoN"
+  ],
   "config_flow": true,
+  "dependencies": ["http"],
   "documentation": "https://github.com/NemoN/ha-chuango-ov300",
+  "integration_type": "device",
   "issue_tracker": "https://github.com/NemoN/ha-chuango-ov300/issues",
   "iot_class": "cloud_polling",
-  "requirements": ["aiomqtt==2.5.0"]
+  "requirements": ["aiomqtt==2.5.0"],
+  "version": "0.2.0"
 }

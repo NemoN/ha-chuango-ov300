@@ -60,6 +60,7 @@ class DreamcatcherAlarmPanel(CoordinatorEntity[DreamcatcherCoordinator], AlarmCo
         self._attr_supported_features = (
             AlarmControlPanelEntityFeature.ARM_HOME
             | AlarmControlPanelEntityFeature.ARM_AWAY
+            | AlarmControlPanelEntityFeature.TRIGGER
         )
         self.device_id = device_id
     
@@ -124,6 +125,12 @@ class DreamcatcherAlarmPanel(CoordinatorEntity[DreamcatcherCoordinator], AlarmCo
         return None
 
     @property
+    def changed_by(self) -> str | None:
+        # Expose who performed the last mode change (from /dout/alarm iN)
+        v = self._st.get("changed_by")
+        return v if isinstance(v, str) and v.strip() else None
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         st = self._st
         return {
@@ -139,6 +146,11 @@ class DreamcatcherAlarmPanel(CoordinatorEntity[DreamcatcherCoordinator], AlarmCo
             "fw": st.get("fw"),
             "ip_local": st.get("ip_local"),
             "last_topic": st.get("last_topic"),
+            "changed_by": st.get("changed_by"),
+            "alarm_evt_code": st.get("alarm_evt_code"),
+            "alarm_evt_nick": st.get("alarm_evt_nick"),
+            "alarm_evt_ts": st.get("alarm_evt_ts"),
+            "alarm_evt_sn": st.get("alarm_evt_sn"),
         }
     
     async def async_alarm_arm_home(self, code: str | None = None) -> None:

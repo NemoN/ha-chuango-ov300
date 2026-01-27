@@ -343,6 +343,30 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 dev_state["qs_d"] = res.get("qs_d")
                 dev_state["qs_p"] = res.get("qs_p")
 
+        # Alarm events (who changed the mode) -> changed_by
+        if topic.endswith("/dout/alarm") and isinstance(data, dict):
+            nick = data.get("iN")          # "Home Assistant" / user alias
+            evt = data.get("iE")           # 12 disarm, 13 arm, 14 home arm
+            ts = data.get("tS")            # unix timestamp
+
+            # Persist raw event details for debugging / attributes
+            dev_state["alarm_evt_code"] = evt
+            dev_state["alarm_evt_nick"] = nick
+            dev_state["alarm_evt_ts"] = ts
+            dev_state["alarm_evt_sn"] = data.get("sN")
+
+            # Only treat mode-changing events as "changed_by"
+            mode_map = {12: "d", 13: "a", 14: "h"}
+            try:
+                evt_i = int(evt)
+            except Exception:
+                evt_i = None
+
+            if evt_i in mode_map:
+                if isinstance(nick, str) and nick.strip():
+                    dev_state["changed_by"] = nick.strip()
+                dev_state["mode"] = mode_map[evt_i]
+
         # Persist in runtime state
         self._mqtt_state[device_id] = dev_state
 
@@ -354,7 +378,7 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_send_alarm_command(self, device_id: str, command: str, code: str | None = None) -> None:
         """Send arm/disarm via MQTT using the existing per-device connection."""
-        
+
         mode = (command or "").lower().strip()
         if mode not in ("d", "a", "h"):
             raise HomeAssistantError(f"Unsupported alarm mode: {command}")
