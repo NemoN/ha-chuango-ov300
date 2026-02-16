@@ -408,3 +408,7 @@ Für Fehler und Feature-Anfragen bitte ein [Issue erstellen](https://github.com/
 [downloads-badge]: https://img.shields.io/github/downloads/NemoN/ha-chuango-ov300/total?style=flat-square
 [build-badge]: https://img.shields.io/github/actions/workflow/status/NemoN/ha-chuango-ov300/hassfest.yml?branch=main&style=flat-square
 [license-badge]: https://img.shields.io/github/license/NemoN/ha-chuango-ov300
+
+<!-- References -->
+
+[release-url]: https://github.com/NemoN/ha-chuango-ov300/releases
