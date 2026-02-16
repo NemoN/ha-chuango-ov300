@@ -402,7 +402,6 @@ Für Fehler und Feature-Anfragen bitte ein [Issue erstellen](https://github.com/
 
 <!-- Badges -->
 
-[hacs-url]: https://github.com/hacs/integration
 [hacs-badge]: https://img.shields.io/badge/hacs-default-orange.svg?style=flat-square
 [release-badge]: https://img.shields.io/github/v/release/NemoN/ha-chuango-ov300?style=flat-square
 [downloads-badge]: https://img.shields.io/github/downloads/NemoN/ha-chuango-ov300/total?style=flat-square
@@ -411,4 +410,5 @@ Für Fehler und Feature-Anfragen bitte ein [Issue erstellen](https://github.com/
 
 <!-- References -->
 
+[hacs-url]: https://github.com/hacs/integration
 [release-url]: https://github.com/NemoN/ha-chuango-ov300/releases
