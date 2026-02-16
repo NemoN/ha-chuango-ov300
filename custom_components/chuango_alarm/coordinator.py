@@ -8,7 +8,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryError, HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -25,6 +25,7 @@ from .const import (
     CONF_LAST_LOGIN,
     CONF_USER_INFO,
     DOMAIN,
+    DOCS_URL,
 )
 
 _REFRESH_BEFORE_SECONDS = 12 * 60 * 60  # 12h
@@ -173,7 +174,10 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             dev.setdefault("mqtt_calc", self._build_mqtt_calc(dev_id, dev))
 
         if not devices_by_id:
-            raise UpdateFailed("No shared devices found for this account")
+            raise ConfigEntryError(
+                "No shared devices found for this account. "
+                f"Please follow the integration documentation: {DOCS_URL}"
+            )
 
         return {
             "userInfo": self.user_info or {},

@@ -275,8 +275,15 @@ class DreamcatcherApiClient:
             except Exception as err:
                 raise DreamcatcherApiError(f"Invalid JSON: {err} | body={truncate(body_text, 300)}") from err
 
+        # Some accounts (or server variants) return an empty object instead of {"list": []}.
+        # Treat that as "no shared devices" so the config flow can show a helpful message.
+        if isinstance(data, dict) and not data:
+            return []
+
         if not isinstance(data, dict) or "list" not in data or not isinstance(data["list"], list):
-            raise DreamcatcherApiError(f"Unexpected shared devices response shape: {truncate(pretty_json(data), 500)}")
+            raise DreamcatcherApiError(
+                f"Unexpected shared devices response shape: {truncate(pretty_json(data), 500)}"
+            )
 
         """ {
             "list": [

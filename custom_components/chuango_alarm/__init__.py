@@ -41,8 +41,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # 2) Start MQTT manager (intern wartet er ggf. bis HA fully started)
     await mqtt.async_start()
 
-    # 3) Ensure MQTT stops on reload/remove (best-effort)
-    entry.async_on_unload(lambda: hass.async_create_task(mqtt.async_stop()))
+    # 3) Ensure MQTT stops on reload/remove.
+    # ConfigEntry will call the callback on unload and schedule the returned coroutine.
+    # Do not create a Task here, otherwise HA will try to schedule a Task as a coroutine.
+    entry.async_on_unload(mqtt.async_stop)
 
     # 4) Setup entities
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

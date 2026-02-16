@@ -55,6 +55,11 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         ]
 
         default_region = "DE" if any(str(c.get("locale")) == "DE" for c in countries) else None
+        default_email: str = ""
+
+        if user_input is not None:
+            default_region = str(user_input.get(CONF_REGION) or default_region or "").strip() or default_region
+            default_email = str(user_input.get(CONF_EMAIL) or "").strip()
 
         schema = vol.Schema(
             {
@@ -65,7 +70,7 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         sort=True,
                     )
                 ),
-                vol.Required(CONF_EMAIL): str,
+                vol.Required(CONF_EMAIL, default=default_email): str,
                 vol.Required("password"): selector.TextSelector(
                     selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
                 ),
@@ -107,6 +112,15 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 password_md5=password_md5,
                 uuid=uuid,
             )
+
+            shared = await api.shared_devices(
+                am_domain=zone.am_domain,
+                am_port=zone.am_port,
+                token=res.token,
+            )
+            if not shared:
+                errors["base"] = "no_shared_devices"
+                return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
         except DreamcatcherAuthError:
             errors["base"] = "invalid_auth"
             return self.async_show_form(step_id="user", data_schema=schema, errors=errors)

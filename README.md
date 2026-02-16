@@ -20,6 +20,11 @@ Home Assistant integration for **Chuango OV-300** WiFi alarm systems via the Dre
 |-------|--------|
 | [OV-300](https://chuango.de/en/products/smart-wifi-alarm-system-ov-300) | Tested |
 
+## Testers Wanted
+
+Testers for other Chuango WiFi alarm systems are wanted.  
+If you use a different Chuango model, please open an issue and share your model name plus test results.
+
 ## Requirements
 
 - A Chuango OV-300 alarm system
@@ -51,7 +56,9 @@ Home Assistant integration for **Chuango OV-300** WiFi alarm systems via the Dre
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for **"Chuango Alarm"**
-4. Enter your credentials:
+4. In the DreamCatcher app, create a dedicated user for Home Assistant (separate email address).
+5. Share your alarm system with that dedicated user in the DreamCatcher app.
+6. Enter that dedicated user's credentials in the integration:
 
 | Field | Description | Example |
 |-------|-------------|---------|
@@ -148,6 +155,7 @@ automation:
 | `Invalid login` | Wrong credentials | Check email and password in DreamCatcher Live app |
 | `Connection failed` | Network issue | Check internet connection, try again later |
 | `Invalid country selection` | Unknown region | Select a valid country from the list |
+| `No shared devices found` | No alarm system shared with this account | Create a dedicated HA user in DreamCatcher app, share the alarm system with that user, then log in with this user in HA |
 | `Already configured` | Duplicate setup | Remove existing integration first |
 
 ### Debug Logging
@@ -213,6 +221,11 @@ Home Assistant Integration für **Chuango OV-300** WLAN-Alarmanlagen über den D
 |--------|--------|
 | [OV-300](https://chuango.de/products/smart-wifi-alarm-system-ov-300) | Getestet |
 
+## Tester Gesucht
+
+Es werden Tester für weitere Chuango WLAN-Alarmanlagen gesucht.  
+Wenn du ein anderes Chuango-Modell nutzt, erstelle bitte ein Issue mit Modellname und Testergebnissen.
+
 ## Voraussetzungen
 
 - Eine Chuango OV-300 Alarmanlage
@@ -244,7 +257,9 @@ Home Assistant Integration für **Chuango OV-300** WLAN-Alarmanlagen über den D
 1. Gehe zu **Einstellungen** → **Geräte & Dienste**
 2. Klicke auf **+ Integration hinzufügen**
 3. Suche nach **"Chuango Alarm"**
-4. Gib deine Anmeldedaten ein:
+4. Lege in der DreamCatcher-App einen eigenen Benutzer für Home Assistant an (separate E-Mail-Adresse).
+5. Gib diesem Benutzer in der DreamCatcher-App die Alarmanlage frei.
+6. Melde die Integration in Home Assistant mit diesem extra Benutzer an:
 
 | Feld | Beschreibung | Beispiel |
 |------|--------------|----------|
@@ -341,6 +356,7 @@ automation:
 | `Invalid login` | Falsche Anmeldedaten | E-Mail und Passwort in der DreamCatcher Live App prüfen |
 | `Connection failed` | Netzwerkproblem | Internetverbindung prüfen, später erneut versuchen |
 | `Invalid country selection` | Unbekannte Region | Ein gültiges Land aus der Liste wählen |
+| `No shared devices found` | Für diesen Account wurde keine Alarmanlage freigegeben | In der DreamCatcher-App einen separaten HA-Benutzer anlegen, Anlage für diesen Benutzer freigeben und mit diesem Benutzer in HA anmelden |
 | `Already configured` | Doppelte Einrichtung | Bestehende Integration zuerst entfernen |
 
 ### Debug-Logging

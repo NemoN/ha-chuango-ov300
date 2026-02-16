@@ -1,6 +1,7 @@
 from homeassistant.const import Platform
 
 DOMAIN = "chuango_alarm"
+DOCS_URL = "https://github.com/NemoN/ha-chuango-ov300#configuration"
 
 # Zone lookup (region -> server endpoints)
 ZONE_API_BASE = "https://query.iotdreamcatcher.net.cn:12082"
@@ -32,15 +33,15 @@ CONF_MQTT_IP = "mqtt_ip"
 CONF_MQTT_PORT = "mqtt_port"
 
 DEFAULT_OS = "android"
-DEFAULT_OS_VER = "29"
+DEFAULT_OS_VER = "34"
 DEFAULT_APP = "com.dc.dreamcatcherlife"
 DEFAULT_APP_VER = "2.2.1"
-DEFAULT_PHONE_BRAND = "GOOGLE"
+DEFAULT_PHONE_BRAND = "SAMSUNG"
 DEFAULT_LANG = "en"
 DEFAULT_BRAND_HEADER = "dreamcatcher"
 
 DEFAULT_USER_AGENT = (
-    "Dalvik/2.1.0 (Linux; U; Android 10; Android SDK built for arm64 Build/QSR1.211112.010)"
+    "Dalvik/2.1.0 (Linux; U; Android 14; SM-S911B Build/UP1A.231005.007)"
 )
 
 PLATFORMS = [Platform.SENSOR, Platform.ALARM_CONTROL_PANEL]

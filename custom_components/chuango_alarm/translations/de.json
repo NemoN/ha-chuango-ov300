@@ -15,7 +15,8 @@
     "error": {
       "invalid_auth": "Login fehlgeschlagen.",
       "cannot_connect": "Verbindung fehlgeschlagen.",
-      "invalid_region": "Ungültige Länderauswahl."
+      "invalid_region": "Ungültige Länderauswahl.",
+      "no_shared_devices": "Keine Shared Devices für dieses Konto gefunden. Bitte die Dokumentation der Integration beachten: https://github.com/NemoN/ha-chuango-ov300"
     },
     "abort": {
       "already_configured": "Integration bereits eingerichtet."
