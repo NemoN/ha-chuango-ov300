@@ -23,6 +23,7 @@ from .const import (
     CONF_MQTT_PORT,
     CONF_REGION,
     CONF_UUID,
+    DOCS_URL,
     DOMAIN,
 )
 from .countries_data import COUNTRIES, LOCALE_TO_COUNTRY
@@ -33,6 +34,10 @@ _LOGGER = logging.getLogger(__name__)
 
 class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
+
+    @staticmethod
+    def _description_placeholders() -> dict[str, str]:
+        return {"docs_url": DOCS_URL}
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
@@ -78,7 +83,12 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         if user_input is None:
-            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=schema,
+                errors=errors,
+                description_placeholders=self._description_placeholders(),
+            )
 
         region = str(user_input[CONF_REGION]).strip()
         email = str(user_input[CONF_EMAIL]).strip()
@@ -87,7 +97,12 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         country = LOCALE_TO_COUNTRY.get(region)
         if not country:
             errors["base"] = "invalid_region"
-            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=schema,
+                errors=errors,
+                description_placeholders=self._description_placeholders(),
+            )
 
         country_name = str(country.get("en") or region)
         country_code = f"+{country['code']}"
@@ -120,13 +135,28 @@ class DreamcatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             if not shared:
                 errors["base"] = "no_shared_devices"
-                return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=schema,
+                    errors=errors,
+                    description_placeholders=self._description_placeholders(),
+                )
         except DreamcatcherAuthError:
             errors["base"] = "invalid_auth"
-            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=schema,
+                errors=errors,
+                description_placeholders=self._description_placeholders(),
+            )
         except DreamcatcherError:
             errors["base"] = "cannot_connect"
-            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=schema,
+                errors=errors,
+                description_placeholders=self._description_placeholders(),
+            )
 
         user_id = str(res.user_info.get("userId", ""))
         alias = str(res.user_info.get("alias", "")) or email
