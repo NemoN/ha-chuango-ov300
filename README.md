@@ -1,6 +1,12 @@
 # Chuango Alarm
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration) [![GitHub Release](https://img.shields.io/github/v/release/NemoN/ha-chuango-ov300)](https://github.com/NemoN/ha-chuango-ov300/releases) [![GitHub License](https://img.shields.io/github/license/NemoN/ha-chuango-ov300)](LICENSE)
+[![hacs][hacs-badge]][hacs-url]
+[![release][release-badge]][release-url]
+![downloads][downloads-badge]
+![build][build-badge]
+![license][license-badge]
+
+<a href="https://www.buymeacoffee.com/nemon" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/white_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>
 
 **[English](#features)** | **[Deutsch](#chuango-alarm-deutsch)**
 
@@ -393,3 +399,12 @@ Beiträge sind willkommen! Bitte:
 3. Reiche einen Pull Request ein
 
 Für Fehler und Feature-Anfragen bitte ein [Issue erstellen](https://github.com/NemoN/ha-chuango-ov300/issues).
+
+<!-- Badges -->
+
+[hacs-url]: https://github.com/hacs/integration
+[hacs-badge]: https://img.shields.io/badge/hacs-default-orange.svg?style=flat-square
+[release-badge]: https://img.shields.io/github/v/release/NemoN/ha-chuango-ov300?style=flat-square
+[downloads-badge]: https://img.shields.io/github/downloads/NemoN/ha-chuango-ov300/total?style=flat-square
+[build-badge]: https://img.shields.io/github/actions/workflow/status/NemoN/ha-chuango-ov300/hassfest.yml?branch=main&style=flat-square
+[license-badge]: https://img.shields.io/github/license/NemoN/ha-chuango-ov300
