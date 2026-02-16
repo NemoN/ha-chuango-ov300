@@ -410,5 +410,6 @@ Für Fehler und Feature-Anfragen bitte ein [Issue erstellen](https://github.com/
 
 <!-- References -->
 
+[hacs]: https://hacs.xyz
 [hacs-url]: https://github.com/hacs/integration
 [release-url]: https://github.com/NemoN/ha-chuango-ov300/releases
