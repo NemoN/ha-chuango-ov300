@@ -398,8 +398,8 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 dev_state["mode"] = mode_map[evt_i]
 
             # Trigger events -> triggered_by
-            # iE=11: SOS (app/keyfob), iE=26: sensor trigger
-            if evt_i in (11, 26):
+            # iE=11: SOS (app/keyfob), iE=15: tamper, iE=26: sensor trigger
+            if evt_i in (11, 15, 26):
                 dev_state["triggered_by"] = nick.strip() if isinstance(nick, str) and nick.strip() else None
                 dev_state["triggered_by_id"] = data.get("iI")
                 dev_state["triggered_by_type"] = data.get("iT")
@@ -499,3 +499,51 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
         await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
+
+    async def async_fetch_alarm_history(self, device_id: str, page_size: int = 50) -> None:
+        """Fetch alarm history from REST API and store in mqtt_state."""
+        try:
+            await self._ensure_login()
+        except Exception:
+            self.logger.warning("Cannot fetch alarm history: login failed")
+            return
+
+        dev = self._get_device(device_id)
+        dev_id_int = dev.get("devIdInt")
+        if not dev_id_int:
+            self.logger.warning("Cannot fetch alarm history: no devIdInt for %s", device_id)
+            return
+
+        # Use per-device dm endpoint, fall back to am endpoint from config entry
+        dm = dev.get("dm") or {}
+        dm_domain = dm.get("domain")
+        dm_port = dm.get("port")
+        if dm_domain and dm_port:
+            base_url = f"https://{dm_domain}:{dm_port}"
+        else:
+            d = self.entry.data
+            base_url = f"https://{d[CONF_AM_DOMAIN]}:{d[CONF_AM_PORT]}"
+
+        try:
+            result = await self.api.alarm_history(
+                base_url=base_url,
+                token=self.token,
+                dev_id_int=int(dev_id_int),
+                page_size=page_size,
+            )
+        except Exception as err:
+            self.logger.warning("Alarm history fetch failed for %s: %s", device_id, err)
+            return
+
+        items = result.get("items", [])
+        total = result.get("total", 0)
+
+        dev_state = dict(self._mqtt_state.get(device_id) or {})
+        dev_state["alarm_history"] = items
+        dev_state["alarm_history_total"] = total
+        self._mqtt_state[device_id] = dev_state
+
+        # Push update
+        cur = dict(self.data or {})
+        cur["mqtt_state"] = dict(self._mqtt_state)
+        self.async_set_updated_data(cur)

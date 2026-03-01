@@ -9,6 +9,7 @@ from typing import Any
 import aiohttp
 
 from .const import (
+    ALARM_HISTORY_PATH,
     DEFAULT_APP,
     DEFAULT_APP_VER,
     DEFAULT_BRAND_HEADER,
@@ -354,3 +355,81 @@ class DreamcatcherApiClient:
             })
 
         return shared_devices
+
+    async def alarm_history(
+        self,
+        *,
+        base_url: str,
+        token: str,
+        dev_id_int: int,
+        offset: int = 0,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        """Fetch alarm event history for a device via REST API (POST)."""
+        url = f"{base_url}{ALARM_HISTORY_PATH}"
+        params = {"token": token}
+        body = {
+            "devIdInt": dev_id_int,
+            "offset": offset,
+            "pageSize": page_size,
+            "random": 0,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Appversion": DEFAULT_APP_VER,
+            "Platform": DEFAULT_OS,
+            "Lang": DEFAULT_LANG,
+            "Brand": DEFAULT_BRAND_HEADER,
+            "User-Agent": DEFAULT_USER_AGENT,
+        }
+
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(
+                "HTTP REQUEST %s %s\nparams=%s\nbody=%s\nheaders=%s",
+                "POST",
+                url,
+                pretty_json(redact_mapping(params)),
+                pretty_json(body),
+                pretty_json(redact_headers(headers)),
+            )
+
+        try:
+            async with asyncio.timeout(20):
+                resp = await self._session.post(url, params=params, json=body, headers=headers)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise DreamcatcherApiError(f"Alarm history connection error: {err}") from err
+
+        async with resp:
+            body_bytes = await resp.read()
+            body_text = body_bytes.decode("utf-8", errors="replace")
+
+            if self._log.isEnabledFor(logging.DEBUG):
+                self._log.debug(
+                    "HTTP RESPONSE %s %s\nstatus=%s\nresp_headers=%s\nbody=%s",
+                    "POST",
+                    str(resp.url),
+                    resp.status,
+                    pretty_json(redact_headers(dict(resp.headers))),
+                    truncate(body_text),
+                )
+
+            if resp.status in (401, 403):
+                raise DreamcatcherAuthError(f"Auth failed ({resp.status}): {truncate(body_text, 300)}")
+
+            if resp.status != 200:
+                raise DreamcatcherApiError(f"HTTP {resp.status}: {truncate(body_text, 300)}")
+
+            try:
+                data = json.loads(body_text)
+            except Exception as err:
+                raise DreamcatcherApiError(
+                    f"Invalid JSON: {err} | body={truncate(body_text, 300)}"
+                ) from err
+
+        if not isinstance(data, dict):
+            raise DreamcatcherApiError(
+                f"Unexpected alarm history response: {truncate(body_text, 300)}"
+            )
+
+        return data

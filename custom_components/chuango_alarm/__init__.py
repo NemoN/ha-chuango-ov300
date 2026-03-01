@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 
 from .api import DreamcatcherApiClient
 from .const import DOMAIN, PLATFORMS
@@ -41,10 +44,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # 2) Start MQTT manager (intern wartet er ggf. bis HA fully started)
     await mqtt.async_start()
 
-    # 3) Ensure MQTT stops on reload/remove.
-    # ConfigEntry will call the callback on unload and schedule the returned coroutine.
-    # Do not create a Task here, otherwise HA will try to schedule a Task as a coroutine.
+    # 3) Ensure MQTT stops on reload/remove and on HA shutdown.
     entry.async_on_unload(mqtt.async_stop)
+
+    # Listen for HA stop event (fires before final task cleanup).
+    async def _on_ha_stop(_event: Any) -> None:
+        await mqtt.async_stop()
+
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _on_ha_stop)
+    )
 
     # 4) Setup entities
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

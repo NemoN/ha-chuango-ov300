@@ -48,11 +48,33 @@
       },
       "keyfob_sensor": {
         "name": "Key Fob"
+      },
+      "ac_power": {
+        "name": "AC Power"
       }
     },
     "button": {
       "refresh_accessories": {
         "name": "Refresh Accessories"
+      }
+    },
+    "event": {
+      "alarm_event": {
+        "name": "Event Log",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "sos": "SOS",
+              "disarmed": "Disarmed",
+              "armed": "Armed",
+              "armed_home": "Armed Home",
+              "tamper": "Tamper Alarm",
+              "ac_power_lost": "AC Power Lost",
+              "ac_power_restored": "AC Power Restored",
+              "sensor_triggered": "Sensor Triggered"
+            }
+          }
+        }
       }
     }
   }

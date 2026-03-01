@@ -10,6 +10,7 @@ ZONE_PATH = "/v2/server/zone"
 # API paths (resolved via zone 'am' endpoint)
 LOGIN_PATH = "/v2/user/login"
 SHARED_DEVICES_PATH = "/v2/user/device/list/shared"
+ALARM_HISTORY_PATH = "/v2/message/list/alarm/device"
 
 CONF_REGION = "region"              # e.g. 'DE'
 CONF_COUNTRY_NAME = "country_name"  # e.g. 'Germany'
@@ -44,4 +45,4 @@ DEFAULT_USER_AGENT = (
     "Dalvik/2.1.0 (Linux; U; Android 14; SM-S911B Build/UP1A.231005.007)"
 )
 
-PLATFORMS = [Platform.SENSOR, Platform.ALARM_CONTROL_PANEL, Platform.SELECT, Platform.SWITCH, Platform.BINARY_SENSOR, Platform.BUTTON]
+PLATFORMS = [Platform.SENSOR, Platform.ALARM_CONTROL_PANEL, Platform.SELECT, Platform.SWITCH, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.EVENT]

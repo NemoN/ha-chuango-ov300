@@ -15,10 +15,11 @@ Home Assistant integration for **Chuango OV-300** WiFi alarm systems via the Dre
 ## Features
 
 - Arm, disarm, and home-arm your alarm system
-- Real-time status updates via MQTT
+- Real-time status updates
 - Shows who changed the alarm state (user attribution)
 - Alarm volume, duration, and arm/disarm beep configuration
 - Accessories / sensor list (door, window, PIR, key fobs) as sub-devices
+- Event log with alarm history
 - Automatic accessory refresh every 24h + manual refresh button
 - Diagnostic sensors (token expiration, device info)
 - Multi-region support (EU, US, Asia, etc.)
@@ -120,6 +121,14 @@ Accessories paired with the alarm panel are automatically discovered and appear 
 |--------|------|-------------|
 | `button.<device>_refresh_accessories` | Button | Manually refresh accessories list |
 
+### Event Log
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| `event.<device>_event_log` | Event | Live alarm events (arm/disarm, SOS, tamper, power, sensor trigger) |
+
+The event entity fires on every alarm event received via MQTT. Historical events from the cloud API are available in the entity's `history` attribute.
+
 ### Diagnostic Sensors
 
 | Entity | Description |
@@ -182,6 +191,32 @@ automation:
           entity_id: alarm_control_panel.ov300_alarm
 ```
 
+### Alarm History Dashboard Card
+
+```yaml
+type: markdown
+title: Alarm History
+content: >-
+  {% set icons = {
+    'disarmed': '🔓',
+    'armed': '🔒',
+    'armed_home': '🏠',
+    'sos': '🆘',
+    'tamper': '⚠️',
+    'ac_power_lost': '🔋',
+    'ac_power_restored': '🔌',
+    'sensor_triggered': '🚨'
+  } %}
+  {% set history = state_attr('event.ov_300_event_log', 'history') %}
+  {% if history %}
+    {% for e in history %}
+  {{ icons.get(e.type, '❓') }} **{{ e.time | timestamp_local('%H:%M:%S') }}** {{ e.name }}
+    {% endfor %}
+  {% else %}
+  No entries
+  {% endif %}
+```
+
 ## Troubleshooting
 
 | Error | Cause | Solution |
@@ -218,6 +253,12 @@ logger:
 - **Specification**: [W800 Spec V2.0](http://ask.winnermicro.com/uploads/20241203/62e2b1e36dd2355a064bd60636ff66ab.pdf)
 
 ## Changelog
+
+### 0.4.0
+
+- **Event log**: Live alarm events (arm/disarm, SOS, tamper, power, sensor trigger) as event entity with cloud history
+- **AC power status**: Binary sensor showing mains/battery power state
+- **Dashboard card**: Markdown card example for alarm history display
 
 ### 0.3.0
 
@@ -263,10 +304,11 @@ Home Assistant Integration für **Chuango OV-300** WLAN-Alarmanlagen über den D
 ## Funktionen
 
 - Scharf-, Unscharf- und Zuhause-Schaltung der Alarmanlage
-- Echtzeit-Statusaktualisierung via MQTT
+- Echtzeit-Statusaktualisierung
 - Zeigt an, wer den Alarmzustand geändert hat
 - Alarmlautstärke, Alarmdauer und Piepton-Einstellungen
 - Zubehör / Sensorliste (Tür, Fenster, PIR, Schlüssel) als Untergeräte
+- Ereignisprotokoll mit Alarm-Verlauf
 - Automatische Zubehör-Aktualisierung alle 24h + manueller Aktualisierungsknopf
 - Diagnosesensoren (Token-Ablauf, Geräteinformationen)
 - Multi-Region-Unterstützung (EU, US, Asien, etc.)
@@ -407,6 +449,32 @@ automation:
           entity_id: alarm_control_panel.ov300_alarm
 ```
 
+### Alarm-Verlauf Dashboard-Karte
+
+```yaml
+type: markdown
+title: Alarm-Verlauf
+content: >-
+  {% set icons = {
+    'disarmed': '🔓',
+    'armed': '🔒',
+    'armed_home': '🏠',
+    'sos': '🆘',
+    'tamper': '⚠️',
+    'ac_power_lost': '🔋',
+    'ac_power_restored': '🔌',
+    'sensor_triggered': '🚨'
+  } %}
+  {% set history = state_attr('event.ov_300_event_log', 'history') %}
+  {% if history %}
+    {% for e in history %}
+  {{ icons.get(e.type, '❓') }} **{{ e.time | timestamp_local('%H:%M:%S') }}** {{ e.name }}
+    {% endfor %}
+  {% else %}
+  Keine Einträge
+  {% endif %}
+```
+
 ## Fehlerbehebung
 
 | Fehler | Ursache | Lösung |
@@ -443,6 +511,12 @@ logger:
 - **Spezifikation**: [W800 Spec V2.0](http://ask.winnermicro.com/uploads/20241203/62e2b1e36dd2355a064bd60636ff66ab.pdf)
 
 ## Änderungsprotokoll
+
+### 0.4.0
+
+- **Ereignisprotokoll**: Live-Alarm-Events (Scharf/Unscharf, SOS, Manipulation, Strom, Sensor) als Event-Entität mit Cloud-Historie
+- **Netzstrom-Status**: Binary Sensor zeigt Netz-/Batteriebetrieb an
+- **Dashboard-Karte**: Markdown-Karte für die Alarm-Verlaufsanzeige
 
 ### 0.3.0
 

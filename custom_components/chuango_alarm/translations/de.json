@@ -48,11 +48,33 @@
       },
       "keyfob_sensor": {
         "name": "Schlüssel"
+      },
+      "ac_power": {
+        "name": "Netzstrom"
       }
     },
     "button": {
       "refresh_accessories": {
         "name": "Zubehör aktualisieren"
+      }
+    },
+    "event": {
+      "alarm_event": {
+        "name": "Ereignisprotokoll",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "sos": "SOS",
+              "disarmed": "Unscharf",
+              "armed": "Scharf",
+              "armed_home": "Teilscharf (Home)",
+              "tamper": "Manipulationsalarm",
+              "ac_power_lost": "Vom Strom getrennt",
+              "ac_power_restored": "Mit Strom verbunden",
+              "sensor_triggered": "Sensor ausgelöst"
+            }
+          }
+        }
       }
     }
   }

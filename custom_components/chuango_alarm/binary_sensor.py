@@ -79,6 +79,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     known: set[str] = set()  # unique_id set
 
+    # Per-device power status sensors (created once)
+    power_entities: list[BinarySensorEntity] = []
+    for dev_id in coordinator.get_device_ids():
+        uid = f"{entry.entry_id}_{dev_id}_ac_power"
+        if uid not in known:
+            known.add(uid)
+            power_entities.append(ChuangoAcPowerSensor(coordinator, entry, dev_id))
+    if power_entities:
+        async_add_entities(power_entities)
+
     def _build_entities() -> list[BinarySensorEntity]:
         """Build entities for all known parts across all devices."""
         entities: list[BinarySensorEntity] = []
@@ -124,9 +134,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     @callback
     def _on_update() -> None:
-        new = _build_entities()
-        if new:
-            hass.async_create_task(platform.async_add_entities(new))
+        new_parts = _build_entities()
+        new_power: list[BinarySensorEntity] = []
+        for dev_id in coordinator.get_device_ids():
+            uid = f"{entry.entry_id}_{dev_id}_ac_power"
+            if uid not in known:
+                known.add(uid)
+                new_power.append(ChuangoAcPowerSensor(coordinator, entry, dev_id))
+        combined = new_parts + new_power
+        if combined:
+            hass.async_create_task(platform.async_add_entities(combined))
 
     coordinator.async_add_listener(_on_update)
 
@@ -273,3 +290,55 @@ class ChuangoKeyfobSensor(CoordinatorEntity[DreamcatcherCoordinator], BinarySens
             "type": self._part.get("t"),
             "status": self._part.get("ss"),
         }
+
+
+class ChuangoAcPowerSensor(CoordinatorEntity[DreamcatcherCoordinator], BinarySensorEntity):
+    """Binary sensor showing whether the alarm panel is on AC power.
+
+    is_on = True  -> AC power (plugged in)
+    is_on = False -> Battery (AC lost)
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "ac_power"
+    _attr_device_class = BinarySensorDeviceClass.PLUG
+
+    def __init__(self, coordinator: DreamcatcherCoordinator, entry: ConfigEntry, device_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry = entry
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry.entry_id}_{device_id}_ac_power"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        d = (self.coordinator.data or {}).get("shared_devices", {}).get(self._device_id, {})
+        alias = d.get("alias") or self._device_id
+        product_id = d.get("product_id") or d.get("mpid") or ""
+        dtype = d.get("dtype") or ""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=alias,
+            manufacturer="Chuango",
+            model=dtype or None,
+            model_id=str(product_id) if product_id else None,
+        )
+
+    @property
+    def _st(self) -> dict[str, Any]:
+        mqtt_state = (self.coordinator.data or {}).get("mqtt_state") or {}
+        if isinstance(mqtt_state, dict):
+            st = mqtt_state.get(self._device_id) or {}
+            return st if isinstance(st, dict) else {}
+        return {}
+
+    @property
+    def available(self) -> bool:
+        online = self._st.get("online")
+        return bool(online) if online is not None else True
+
+    @property
+    def is_on(self) -> bool | None:
+        power = self._st.get("power")
+        if power is None:
+            return None
+        return str(power).lower() == "ac"
