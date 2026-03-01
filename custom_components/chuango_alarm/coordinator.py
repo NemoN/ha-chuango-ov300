@@ -330,22 +330,48 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             m = data.get("m")
             res = m.get("res") if isinstance(m, dict) else None
             if isinstance(res, dict):
-                dev_state["mode"] = res.get("mode")     # d/a/h/...
-                dev_state["alarm"] = res.get("alarm")   # 0/1
-                dev_state["trig"] = res.get("trig")
-                dev_state["power"] = res.get("power")
-                dev_state["time"] = res.get("time")
+                action = res.get("a")
+                if action == "host_stat" or action is None:
+                    dev_state["mode"] = res.get("mode")     # d/a/h/...
+                    dev_state["alarm"] = res.get("alarm")   # 0/1
+                    dev_state["trig"] = res.get("trig")
+                    dev_state["power"] = res.get("power")
+                    dev_state["time"] = res.get("time")
+                if action == "host_conf":
+                    is_conf = res.get("IS")
+                    if isinstance(is_conf, dict):
+                        dev_state["alarm_volume"] = is_conf.get("v")
+                        dev_state["arm_beep"] = is_conf.get("t")
+                        dev_state["alarm_duration"] = is_conf.get("tm")
 
         # Info
         if topic.endswith("/dout/info") and isinstance(data, dict):
             m = data.get("m")
             res = m.get("res") if isinstance(m, dict) else None
             if isinstance(res, dict):
-                dev_state["tz"] = res.get("tz")
-                dev_state["fw"] = res.get("w_v")
-                dev_state["ip_local"] = res.get("ip")
-                dev_state["qs_d"] = res.get("qs_d")
-                dev_state["qs_p"] = res.get("qs_p")
+                action = res.get("a")
+                if action == "dev_conf" or action is None:
+                    dev_state["tz"] = res.get("tz")
+                    dev_state["fw"] = res.get("w_v")
+                    dev_state["ip_local"] = res.get("ip")
+                    dev_state["qs_d"] = res.get("qs_d")
+                    dev_state["qs_p"] = res.get("qs_p")
+                if action == "parts_list":
+                    parts = res.get("parts")
+                    page = res.get("page", 1)
+                    finish = res.get("finish", 1)
+                    if isinstance(parts, list):
+                        existing = dev_state.get("parts") or []
+                        if page == 1:
+                            existing = []
+                        existing = list(existing) + parts
+                        dev_state["parts"] = existing
+                    # Request next page if not finished
+                    if finish == 0:
+                        next_page = (page or 1) + 1
+                        self.hass.async_create_task(
+                            self.async_request_parts_list(device_id, page=next_page)
+                        )
 
         # Alarm events (who changed the mode) -> changed_by
         if topic.endswith("/dout/alarm") and isinstance(data, dict):
@@ -371,6 +397,14 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     dev_state["changed_by"] = nick.strip()
                 dev_state["mode"] = mode_map[evt_i]
 
+            # Trigger events -> triggered_by
+            # iE=11: SOS (app/keyfob), iE=26: sensor trigger
+            if evt_i in (11, 26):
+                dev_state["triggered_by"] = nick.strip() if isinstance(nick, str) and nick.strip() else None
+                dev_state["triggered_by_id"] = data.get("iI")
+                dev_state["triggered_by_type"] = data.get("iT")
+                dev_state["triggered_at"] = ts
+
         # Persist in runtime state
         self._mqtt_state[device_id] = dev_state
 
@@ -379,6 +413,58 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         cur["mqtt_state"] = dict(self._mqtt_state)
 
         self.async_set_updated_data(cur)
+
+    async def async_request_parts_list(self, device_id: str, page: int = 1) -> None:
+        """Request the parts/accessories list via MQTT (paginated)."""
+        topic = self.get_mqtt_din_config_topic(device_id)
+        payload_obj = {"m": {"req": {"a": "parts_list", "type": "all", "page": page}}}
+        payload = json.dumps(payload_obj, separators=(",", ":"), ensure_ascii=False)
+
+        runtime = (self.hass.data.get(DOMAIN) or {}).get(self.entry.entry_id) or {}
+        mqtt = runtime.get("mqtt")
+        if mqtt is None:
+            raise HomeAssistantError("MQTT manager not available")
+
+        self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
+        await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
+
+    async def async_request_host_conf(self, device_id: str) -> None:
+        """Request the current host configuration via MQTT."""
+        topic = self.get_mqtt_din_config_topic(device_id)
+        payload_obj = {"m": {"req": {"a": "host_conf"}}}
+        payload = json.dumps(payload_obj, separators=(",", ":"), ensure_ascii=False)
+
+        runtime = (self.hass.data.get(DOMAIN) or {}).get(self.entry.entry_id) or {}
+        mqtt = runtime.get("mqtt")
+        if mqtt is None:
+            raise HomeAssistantError("MQTT manager not available")
+
+        self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
+        await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
+
+    async def async_send_host_conf(self, device_id: str, *, volume: int | None = None, arm_beep: int | None = None, alarm_duration: int | None = None) -> None:
+        """Send host configuration changes via MQTT."""
+        # Read current values from mqtt_state so we can send all IS fields
+        dev_state = (self._mqtt_state.get(device_id) or {})
+        cur_v = dev_state.get("alarm_volume", 1)
+        cur_t = dev_state.get("arm_beep", 1)
+        cur_tm = dev_state.get("alarm_duration", 1)
+
+        v = volume if volume is not None else cur_v
+        t = arm_beep if arm_beep is not None else cur_t
+        tm = alarm_duration if alarm_duration is not None else cur_tm
+
+        topic = self.get_mqtt_din_config_topic(device_id)
+        payload_obj = {"m": {"req": {"a": "host_conf", "IS": {"v": v, "t": t, "tm": tm}}}}
+        payload = json.dumps(payload_obj, separators=(",", ":"), ensure_ascii=False)
+
+        runtime = (self.hass.data.get(DOMAIN) or {}).get(self.entry.entry_id) or {}
+        mqtt = runtime.get("mqtt")
+        if mqtt is None:
+            raise HomeAssistantError("MQTT manager not available")
+
+        self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
+        await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
 
     async def async_send_alarm_command(self, device_id: str, command: str, code: str | None = None) -> None:
         """Send arm/disarm via MQTT using the existing per-device connection."""

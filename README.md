@@ -17,6 +17,9 @@ Home Assistant integration for **Chuango OV-300** WiFi alarm systems via the Dre
 - Arm, disarm, and home-arm your alarm system
 - Real-time status updates via MQTT
 - Shows who changed the alarm state (user attribution)
+- Alarm volume, duration, and arm/disarm beep configuration
+- Accessories / sensor list (door, window, PIR, key fobs) as sub-devices
+- Automatic accessory refresh every 24h + manual refresh button
 - Diagnostic sensors (token expiration, device info)
 - Multi-region support (EU, US, Asia, etc.)
 
@@ -94,7 +97,30 @@ If you use a different Chuango model, please open an issue and share your model 
 - Disarm
 - Trigger
 
-### Sensors
+### Configuration Entities
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| `select.<device>_alarm_volume` | Select | Alarm volume (Mute / Low / Medium / High) |
+| `select.<device>_alarm_duration` | Select | Alarm duration in minutes (1–5) |
+| `switch.<device>_arm_disarm_beep` | Switch | Enable/disable arm/disarm beep tone |
+
+### Accessories (Sub-Devices)
+
+Accessories paired with the alarm panel are automatically discovered and appear as sub-devices:
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| `binary_sensor.<sensor_name>` | Binary Sensor | Door/window/PIR sensor (device class auto-detected) |
+| `binary_sensor.<keyfob_name>` | Binary Sensor | Key fob / remote presence |
+
+### Utility
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| `button.<device>_refresh_accessories` | Button | Manually refresh accessories list |
+
+### Diagnostic Sensors
 
 | Entity | Description |
 |--------|-------------|
@@ -119,7 +145,9 @@ automation:
       - service: notify.mobile_app_phone
         data:
           title: "Alarm!"
-          message: "The alarm has been triggered!"
+          message: >-
+            Alarm triggered by
+            {{ state_attr('alarm_control_panel.ov300_alarm', 'triggered_by') }}
           data:
             priority: high
 ```
@@ -189,6 +217,25 @@ logger:
 - **Documentation**: [W800 Developer Guide](https://doc.winnermicro.net/w800/en/latest/soc_guides/index.html)
 - **Specification**: [W800 Spec V2.0](http://ask.winnermicro.com/uploads/20241203/62e2b1e36dd2355a064bd60636ff66ab.pdf)
 
+## Changelog
+
+### 0.3.0
+
+- **Alarm settings**: Configure alarm volume (mute/low/medium/high), alarm duration (1–5 min), and arm/disarm beep on/off
+- **Accessories as sub-devices**: Door, window, PIR sensors and key fobs appear as sub-devices beneath the alarm panel
+- **Refresh accessories**: Manual button to refresh the accessories list, plus automatic refresh every 24 hours
+- **Triggered-by tracking**: Shows which sensor or user triggered the alarm (including SOS)
+- **Improved shutdown**: Clean integration shutdown without errors
+
+### 0.2.3
+
+- Initial public release
+- Alarm control panel (arm away, arm home, disarm)
+- Real-time status updates
+- User attribution (who changed the alarm state)
+- Diagnostic sensors (user, token expiration, device info)
+- Multi-region support
+
 ## Contributing
 
 Contributions are welcome! Please:
@@ -218,6 +265,9 @@ Home Assistant Integration für **Chuango OV-300** WLAN-Alarmanlagen über den D
 - Scharf-, Unscharf- und Zuhause-Schaltung der Alarmanlage
 - Echtzeit-Statusaktualisierung via MQTT
 - Zeigt an, wer den Alarmzustand geändert hat
+- Alarmlautstärke, Alarmdauer und Piepton-Einstellungen
+- Zubehör / Sensorliste (Tür, Fenster, PIR, Schlüssel) als Untergeräte
+- Automatische Zubehör-Aktualisierung alle 24h + manueller Aktualisierungsknopf
 - Diagnosesensoren (Token-Ablauf, Geräteinformationen)
 - Multi-Region-Unterstützung (EU, US, Asien, etc.)
 
@@ -320,7 +370,9 @@ automation:
       - service: notify.mobile_app_handy
         data:
           title: "Alarm!"
-          message: "Der Alarm wurde ausgelöst!"
+          message: >-
+            Alarm ausgelöst durch
+            {{ state_attr('alarm_control_panel.ov300_alarm', 'triggered_by') }}
           data:
             priority: high
 ```
@@ -389,6 +441,25 @@ logger:
 - **SoC**: WinnerMicro W800
 - **Dokumentation**: [W800 Developer Guide](https://doc.winnermicro.net/w800/en/latest/soc_guides/index.html)
 - **Spezifikation**: [W800 Spec V2.0](http://ask.winnermicro.com/uploads/20241203/62e2b1e36dd2355a064bd60636ff66ab.pdf)
+
+## Änderungsprotokoll
+
+### 0.3.0
+
+- **Alarm-Einstellungen**: Alarmlautstärke (Stumm/Niedrig/Mittel/Laut), Alarmdauer (1–5 Min.) und Piepton Scharf/Unscharf konfigurierbar
+- **Zubehör als Untergeräte**: Tür-, Fenster-, PIR-Sensoren und Schlüssel erscheinen als Untergeräte unter der Alarmanlage
+- **Zubehör aktualisieren**: Manueller Button zum Aktualisieren der Zubehörliste, plus automatische Aktualisierung alle 24 Stunden
+- **Auslöser-Nachverfolgung**: Zeigt an, welcher Sensor oder Benutzer den Alarm ausgelöst hat (inkl. SOS)
+- **Verbesserter Shutdown**: Sauberes Beenden der Integration ohne Fehlermeldungen
+
+### 0.2.3
+
+- Erste öffentliche Veröffentlichung
+- Alarm-Zentrale (Scharf Abwesend, Scharf Zuhause, Unscharf)
+- Echtzeit-Statusaktualisierung
+- Benutzer-Zuordnung (wer hat den Alarmzustand geändert)
+- Diagnosesensoren (Benutzer, Token-Ablauf, Geräteinfo)
+- Multi-Region-Unterstützung
 
 ## Mitwirken
 

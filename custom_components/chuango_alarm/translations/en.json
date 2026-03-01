@@ -21,5 +21,39 @@
     "abort": {
       "already_configured": "Integration already configured."
     }
+  },
+  "entity": {
+    "select": {
+      "alarm_volume": {
+        "name": "Alarm Volume",
+        "state": {
+          "mute": "Mute",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "alarm_duration": {
+        "name": "Alarm Duration (Minutes)"
+      }
+    },
+    "switch": {
+      "arm_disarm_beep": {
+        "name": "Arm/Disarm Beep"
+      }
+    },
+    "binary_sensor": {
+      "accessory_sensor": {
+        "name": "Sensor"
+      },
+      "keyfob_sensor": {
+        "name": "Key Fob"
+      }
+    },
+    "button": {
+      "refresh_accessories": {
+        "name": "Refresh Accessories"
+      }
+    }
   }
 }

@@ -21,5 +21,39 @@
     "abort": {
       "already_configured": "Integration bereits eingerichtet."
     }
+  },
+  "entity": {
+    "select": {
+      "alarm_volume": {
+        "name": "Alarmlautstärke",
+        "state": {
+          "mute": "Stumm",
+          "low": "Niedrig",
+          "medium": "Mittel",
+          "high": "Laut"
+        }
+      },
+      "alarm_duration": {
+        "name": "Alarmdauer (Minuten)"
+      }
+    },
+    "switch": {
+      "arm_disarm_beep": {
+        "name": "Piepton Scharf/Unscharf"
+      }
+    },
+    "binary_sensor": {
+      "accessory_sensor": {
+        "name": "Sensor"
+      },
+      "keyfob_sensor": {
+        "name": "Schlüssel"
+      }
+    },
+    "button": {
+      "refresh_accessories": {
+        "name": "Zubehör aktualisieren"
+      }
+    }
   }
 }

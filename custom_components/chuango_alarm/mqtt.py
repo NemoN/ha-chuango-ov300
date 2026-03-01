@@ -13,6 +13,9 @@ from homeassistant.exceptions import HomeAssistantError
 from .coordinator import DreamcatcherCoordinator
 
 
+PARTS_REFRESH_INTERVAL = 24 * 60 * 60  # 24 h (relative to HA start / connect)
+
+
 class DreamcatcherMqttManager:
     def __init__(self, hass: HomeAssistant, coordinator: DreamcatcherCoordinator, logger: logging.Logger) -> None:
         self.hass = hass
@@ -32,6 +35,9 @@ class DreamcatcherMqttManager:
         self._remove_coord_listener: Callable[[], None] | None = None
         self._remove_ha_started_listener: Callable[[], None] | None = None
         self._started = False
+
+        # periodic parts_list refresh tasks (one per device)
+        self._parts_refresh_tasks: dict[str, asyncio.Task] = {}
 
     async def async_start(self) -> None:
         if self._started:
@@ -72,6 +78,13 @@ class DreamcatcherMqttManager:
         if self._remove_coord_listener is not None:
             self._remove_coord_listener()
             self._remove_coord_listener = None
+
+        # cancel periodic parts refresh tasks
+        for t in self._parts_refresh_tasks.values():
+            t.cancel()
+        if self._parts_refresh_tasks:
+            await asyncio.gather(*self._parts_refresh_tasks.values(), return_exceptions=True)
+        self._parts_refresh_tasks.clear()
 
         tasks = list(self._tasks.values())
         for t in tasks:
@@ -186,6 +199,21 @@ class DreamcatcherMqttManager:
                     self._clients[device_id] = client
                     self._get_connected_event(device_id).set()
 
+                    # Request current host configuration on connect
+                    try:
+                        await self.coordinator.async_request_host_conf(device_id)
+                    except Exception as err:
+                        self._log.debug("Failed to request host_conf for %s: %s", device_id, err)
+
+                    # Request parts/accessories list on connect
+                    try:
+                        await self.coordinator.async_request_parts_list(device_id, page=1)
+                    except Exception as err:
+                        self._log.debug("Failed to request parts_list for %s: %s", device_id, err)
+
+                    # Start periodic parts_list refresh (every 24h)
+                    self._start_parts_refresh(device_id)
+
                     interval = 5
 
                     async for msg in client.messages:
@@ -204,9 +232,12 @@ class DreamcatcherMqttManager:
                 self._clear_client(device_id)
             except asyncio.CancelledError:
                 self._clear_client(device_id)
-                raise
+                return
             except aiomqtt.MqttError as err:
                 self._clear_client(device_id)
+                self._stop_parts_refresh(device_id)
+                if self._stop.is_set():
+                    return
                 self._log.debug(
                     "MQTT connection lost for %s (%s); reconnecting in %ss",
                     device_id, err, interval
@@ -215,6 +246,38 @@ class DreamcatcherMqttManager:
                 interval = min(interval_max, interval * 2)
             except Exception as err:
                 self._clear_client(device_id)
+                self._stop_parts_refresh(device_id)
+                if self._stop.is_set():
+                    return
                 self._log.exception("MQTT loop error for %s: %s", device_id, err)
                 await asyncio.sleep(interval)
                 interval = min(interval_max, interval * 2)
+
+    # ---------- periodic parts_list refresh ----------
+
+    def _start_parts_refresh(self, device_id: str) -> None:
+        """Start a background task that re-requests parts_list every 24 h."""
+        self._stop_parts_refresh(device_id)
+        self._parts_refresh_tasks[device_id] = self.hass.async_create_task(
+            self._parts_refresh_loop(device_id)
+        )
+
+    def _stop_parts_refresh(self, device_id: str) -> None:
+        task = self._parts_refresh_tasks.pop(device_id, None)
+        if task is not None:
+            task.cancel()
+
+    async def _parts_refresh_loop(self, device_id: str) -> None:
+        """Sleep 24 h, then re-request parts_list. Repeats until cancelled."""
+        try:
+            while not self._stop.is_set():
+                await asyncio.sleep(PARTS_REFRESH_INTERVAL)
+                if self._stop.is_set():
+                    break
+                self._log.debug("Periodic parts_list refresh for %s", device_id)
+                try:
+                    await self.coordinator.async_request_parts_list(device_id, page=1)
+                except Exception as err:
+                    self._log.debug("Periodic parts_list refresh failed for %s: %s", device_id, err)
+        except asyncio.CancelledError:
+            pass

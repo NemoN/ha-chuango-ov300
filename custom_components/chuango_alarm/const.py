@@ -44,4 +44,4 @@ DEFAULT_USER_AGENT = (
     "Dalvik/2.1.0 (Linux; U; Android 14; SM-S911B Build/UP1A.231005.007)"
 )
 
-PLATFORMS = [Platform.SENSOR, Platform.ALARM_CONTROL_PANEL]
+PLATFORMS = [Platform.SENSOR, Platform.ALARM_CONTROL_PANEL, Platform.SELECT, Platform.SWITCH, Platform.BINARY_SENSOR, Platform.BUTTON]
