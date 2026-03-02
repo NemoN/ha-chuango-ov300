@@ -24,11 +24,14 @@ Home Assistant integration for **Chuango OV-300** WiFi alarm systems via the Dre
 - Diagnostic sensors (token expiration, device info)
 - Multi-region support (EU, US, Asia, etc.)
 
+![Home Assistant](documentation/images/ov300_device_en.png)
+
 ## Supported Models
 
 | Model | Status |
 |-------|--------|
 | [OV-300](https://chuango.de/en/products/smart-wifi-alarm-system-ov-300) | Tested |
+| [LTE-400](https://chuango.de/en/products/wifi-4g-alarm-system-lte-400) | Untested |
 
 ## Testers Wanted
 
@@ -254,6 +257,13 @@ logger:
 
 ## Changelog
 
+### 0.4.1
+
+- **Translations**: Added `strings.json` for proper translation support; entity names now correctly translate based on HA system language
+- **Live event delivery**: Alarm events are now delivered immediately via HA dispatcher signals instead of coordinator updates, fixing missed or delayed events
+- **Live event history**: Live MQTT alarm events are now appended to the history attribute in real-time
+- **Screenshots**: Added device page screenshots (English & German) to README
+
 ### 0.4.0
 
 - **Event log**: Live alarm events (arm/disarm, SOS, tamper, power, sensor trigger) as event entity with cloud history
@@ -313,11 +323,14 @@ Home Assistant Integration für **Chuango OV-300** WLAN-Alarmanlagen über den D
 - Diagnosesensoren (Token-Ablauf, Geräteinformationen)
 - Multi-Region-Unterstützung (EU, US, Asien, etc.)
 
+![Home Assistant](documentation/images/ov300_device_de.png)
+
 ## Unterstützte Modelle
 
 | Modell | Status |
 |--------|--------|
 | [OV-300](https://chuango.de/products/smart-wifi-alarm-system-ov-300) | Getestet |
+| [LTE-400](https://chuango.de/products/wifi-4g-alarm-system-lte-400) | Ungetestet |
 
 ## Tester Gesucht
 
@@ -511,6 +524,13 @@ logger:
 - **Spezifikation**: [W800 Spec V2.0](http://ask.winnermicro.com/uploads/20241203/62e2b1e36dd2355a064bd60636ff66ab.pdf)
 
 ## Änderungsprotokoll
+
+### 0.4.1
+
+- **Übersetzungen**: `strings.json` für korrektes Übersetzungssystem hinzugefügt; Entity-Namen werden nun korrekt anhand der HA-Systemsprache übersetzt
+- **Live-Event-Zustellung**: Alarm-Events werden jetzt sofort per HA-Dispatcher-Signal ausgeliefert statt über Coordinator-Updates, wodurch fehlende oder verzögerte Events behoben werden
+- **Live-Event-Historie**: Live-MQTT-Alarm-Events werden nun in Echtzeit in das History-Attribut geschrieben
+- **Screenshots**: Geräteseiten-Screenshots (Englisch & Deutsch) zur README hinzugefügt
 
 ### 0.4.0
 

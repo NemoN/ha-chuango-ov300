@@ -1,0 +1,81 @@
+{
+  "title": "Chuango Alarm",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Login",
+        "description": "Please enter your 'DreamCatcher Live' credentials:",
+        "data": {
+          "region": "Country",
+          "email": "E-Mail",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid login.",
+      "cannot_connect": "Connection failed.",
+      "invalid_region": "Invalid country selection.",
+      "no_shared_devices": "No shared devices found for this account. Please follow the integration documentation: {docs_url}"
+    },
+    "abort": {
+      "already_configured": "Integration already configured."
+    }
+  },
+  "entity": {
+    "select": {
+      "alarm_volume": {
+        "name": "Alarm Volume",
+        "state": {
+          "mute": "Mute",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "alarm_duration": {
+        "name": "Alarm Duration (Minutes)"
+      }
+    },
+    "switch": {
+      "arm_disarm_beep": {
+        "name": "Arm/Disarm Beep"
+      }
+    },
+    "binary_sensor": {
+      "accessory_sensor": {
+        "name": "Sensor"
+      },
+      "keyfob_sensor": {
+        "name": "Key Fob"
+      },
+      "ac_power": {
+        "name": "AC Power"
+      }
+    },
+    "button": {
+      "refresh_accessories": {
+        "name": "Refresh Accessories"
+      }
+    },
+    "event": {
+      "alarm_event": {
+        "name": "Event Log",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "sos": "SOS",
+              "disarmed": "Disarmed",
+              "armed": "Armed",
+              "armed_home": "Armed Home",
+              "tamper": "Tamper Alarm",
+              "ac_power_lost": "AC Power Lost",
+              "ac_power_restored": "AC Power Restored",
+              "sensor_triggered": "Sensor Triggered"
+            }
+          }
+        }
+      }
+    }
+  }
+}

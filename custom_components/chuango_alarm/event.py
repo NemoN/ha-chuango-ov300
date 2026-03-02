@@ -7,6 +7,7 @@ from homeassistant.components.event import EventEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_platform
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -145,39 +146,51 @@ class ChuangoAlarmEvent(
         await super().async_added_to_hass()
         # Remember current sn so we don't re-fire a pre-existing event
         self._last_sn = self._st.get("alarm_evt_sn")
+
+        # Listen for live alarm events via dispatcher (bypasses coordinator
+        # debouncing so every single event is delivered immediately).
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_alarm_event_{self.device_id}",
+                self._on_live_alarm_event,
+            )
+        )
+
         # Fetch REST history in the background
         self.hass.async_create_task(
             self.coordinator.async_fetch_alarm_history(self.device_id)
         )
 
-    # ---- coordinator update → trigger event if new ----
+    # ---- dispatcher callback for live alarm events ----
+
+    @callback
+    def _on_live_alarm_event(self, event_data: dict[str, Any]) -> None:
+        """Handle a live alarm event delivered directly via dispatcher."""
+        evt_i = event_data.get("evt_code")
+        sn = event_data.get("sn")
+
+        # Update last_sn to keep coordinator fallback in sync
+        if sn is not None:
+            self._last_sn = sn
+
+        event_type = EVENT_CODE_MAP.get(evt_i)
+        if event_type:
+            self._trigger_event(
+                event_type,
+                {
+                    "name": event_data.get("nick", ""),
+                    "event_code": evt_i,
+                    "timestamp": event_data.get("ts"),
+                },
+            )
+            self._history_initial_fired = True
+
+    # ---- coordinator update → fire initial history event + state sync ----
 
     @callback
     def _handle_coordinator_update(self) -> None:
         st = self._st
-        sn = st.get("alarm_evt_sn")
-
-        # Live MQTT event (new sequence number)
-        if sn is not None and sn != self._last_sn:
-            self._last_sn = sn
-            evt_code = st.get("alarm_evt_code")
-            try:
-                evt_i = int(evt_code)
-            except (TypeError, ValueError):
-                evt_i = None
-
-            event_type = EVENT_CODE_MAP.get(evt_i)
-            if event_type:
-                self._trigger_event(
-                    event_type,
-                    {
-                        "name": st.get("alarm_evt_nick", ""),
-                        "event_code": evt_i,
-                        "timestamp": st.get("alarm_evt_ts"),
-                    },
-                )
-                self._history_initial_fired = True
-                return  # _trigger_event already calls async_write_ha_state
 
         # Fire the most recent REST history entry once to avoid "Unknown" state
         if not self._history_initial_fired:

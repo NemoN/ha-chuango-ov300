@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError, HomeAssistantError
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -385,6 +386,18 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             dev_state["alarm_evt_ts"] = ts
             dev_state["alarm_evt_sn"] = data.get("sN")
 
+            # Prepend live event to alarm_history so it appears in
+            # extra_state_attributes immediately (same format as REST items).
+            live_item = {
+                "itemEvent": evt,
+                "itemName": nick or "",
+                "time": ts,
+            }
+            history = list(dev_state.get("alarm_history") or [])
+            history.insert(0, live_item)
+            dev_state["alarm_history"] = history
+            dev_state["alarm_history_total"] = dev_state.get("alarm_history_total", len(history)) + 1
+
             # Only treat mode-changing events as "changed_by"
             mode_map = {12: "d", 13: "a", 14: "h"}
             try:
@@ -404,6 +417,19 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 dev_state["triggered_by_id"] = data.get("iI")
                 dev_state["triggered_by_type"] = data.get("iT")
                 dev_state["triggered_at"] = ts
+
+            # Fire dispatcher signal immediately so event entities
+            # receive every alarm regardless of coordinator debouncing.
+            async_dispatcher_send(
+                self.hass,
+                f"{DOMAIN}_alarm_event_{device_id}",
+                {
+                    "evt_code": evt_i,
+                    "nick": nick,
+                    "ts": ts,
+                    "sn": data.get("sN"),
+                },
+            )
 
         # Persist in runtime state
         self._mqtt_state[device_id] = dev_state
