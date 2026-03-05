@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Added Chinese translations (`zh-Hans`, `zh-Hant`) for the integration
+- Synced base English localization keys with the current feature set
+- Moved release notes to dedicated `CHANGELOG.md`
+
 ## 0.5.0
 
 - Added firmware version sensor and firmware update entity

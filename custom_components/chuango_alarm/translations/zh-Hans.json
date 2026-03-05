@@ -1,0 +1,141 @@
+{
+  "title": "Chuango 报警系统",
+  "config": {
+    "step": {
+      "user": {
+        "title": "登录",
+        "description": "请输入你的 DreamCatcher Live 账户信息：",
+        "data": {
+          "region": "国家/地区",
+          "email": "电子邮箱",
+          "password": "密码"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "登录信息无效。",
+      "cannot_connect": "连接失败。",
+      "invalid_region": "国家/地区选择无效。",
+      "no_shared_devices": "当前账号未找到已共享设备。请参考集成文档：{docs_url}"
+    },
+    "abort": {
+      "already_configured": "集成已配置。"
+    }
+  },
+  "entity": {
+    "select": {
+      "alarm_volume": {
+        "name": "报警音量",
+        "state": {
+          "mute": "静音",
+          "low": "低",
+          "medium": "中",
+          "high": "高"
+        }
+      },
+      "alarm_duration": {
+        "name": "报警时长（分钟）"
+      },
+      "part_zone": {
+        "name": "防区",
+        "state": {
+          "zone_24h": "24 小时组",
+          "zone_normal": "布防组",
+          "zone_home": "居家组",
+          "zone_delay": "延时组"
+        }
+      }
+    },
+    "switch": {
+      "arm_disarm_beep": {
+        "name": "布防/撤防提示音"
+      },
+      "entry_delay_tone": {
+        "name": "入延时提示音"
+      },
+      "exit_delay_tone": {
+        "name": "出延时提示音"
+      },
+      "test_mode": {
+        "name": "RF 测试模式"
+      },
+      "part_enabled": {
+        "name": "启用"
+      },
+      "part_sos": {
+        "name": "SOS 启用"
+      }
+    },
+    "number": {
+      "entry_delay": {
+        "name": "入延时（秒）"
+      },
+      "exit_delay": {
+        "name": "出延时（秒）"
+      }
+    },
+    "binary_sensor": {
+      "accessory_sensor": {
+        "name": "传感器"
+      },
+      "keyfob_sensor": {
+        "name": "钥匙遥控器"
+      },
+      "ac_power": {
+        "name": "交流电源"
+      }
+    },
+    "sensor": {
+      "firmware_version": {
+        "name": "固件版本"
+      }
+    },
+    "update": {
+      "firmware_update": {
+        "name": "固件更新"
+      }
+    },
+    "button": {
+      "refresh_accessories": {
+        "name": "刷新配件"
+      }
+    },
+    "event": {
+      "alarm_event": {
+        "name": "事件日志",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "normal_alarm": "报警",
+              "sos": "SOS",
+              "disarmed": "已撤防",
+              "armed": "已布防",
+              "armed_home": "居家布防",
+              "tamper": "防拆报警",
+              "low_battery": "电量低",
+              "duress_alarm": "胁迫报警",
+              "offline": "设备离线",
+              "line_cut": "线路断开",
+              "ac_power_lost": "交流电断电",
+              "ac_power_restored": "交流电恢复",
+              "above_limit": "超过上限",
+              "below_limit": "低于下限",
+              "deviation": "偏差",
+              "sensor_triggered": "传感器触发",
+              "schedule_alarm": "定时报警",
+              "door_open": "门/窗打开",
+              "door_closed": "门/窗关闭",
+              "smoke_detected": "检测到烟雾",
+              "alarm_test": "报警测试",
+              "system_fault": "系统故障",
+              "sensor_end_of_life": "传感器寿命到期",
+              "rf_interference": "射频干扰",
+              "chime": "门铃提示",
+              "door_unlocked": "门已解锁"
+            }
+          }
+        }
+      }
+    }
+  }
+}

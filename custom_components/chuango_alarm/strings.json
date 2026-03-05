@@ -35,11 +35,43 @@
       },
       "alarm_duration": {
         "name": "Alarm Duration (Minutes)"
+      },
+      "part_zone": {
+        "name": "Zone",
+        "state": {
+          "zone_24h": "24h Group",
+          "zone_normal": "Armed Group",
+          "zone_home": "Home Group",
+          "zone_delay": "Delay Group"
+        }
       }
     },
     "switch": {
       "arm_disarm_beep": {
         "name": "Arm/Disarm Beep"
+      },
+      "entry_delay_tone": {
+        "name": "Entry Delay Tone"
+      },
+      "exit_delay_tone": {
+        "name": "Exit Delay Tone"
+      },
+      "test_mode": {
+        "name": "RF Test Mode"
+      },
+      "part_enabled": {
+        "name": "Enabled"
+      },
+      "part_sos": {
+        "name": "SOS Enabled"
+      }
+    },
+    "number": {
+      "entry_delay": {
+        "name": "Entry Delay (Seconds)"
+      },
+      "exit_delay": {
+        "name": "Exit Delay (Seconds)"
       }
     },
     "binary_sensor": {
@@ -51,6 +83,16 @@
       },
       "ac_power": {
         "name": "AC Power"
+      }
+    },
+    "sensor": {
+      "firmware_version": {
+        "name": "Firmware Version"
+      }
+    },
+    "update": {
+      "firmware_update": {
+        "name": "Firmware Update"
       }
     },
     "button": {

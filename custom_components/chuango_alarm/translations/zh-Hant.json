@@ -1,0 +1,141 @@
+{
+  "title": "Chuango 警報系統",
+  "config": {
+    "step": {
+      "user": {
+        "title": "登入",
+        "description": "請輸入你的 DreamCatcher Live 帳號資訊：",
+        "data": {
+          "region": "國家/地區",
+          "email": "電子郵件",
+          "password": "密碼"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "登入資訊無效。",
+      "cannot_connect": "連線失敗。",
+      "invalid_region": "國家/地區選擇無效。",
+      "no_shared_devices": "此帳號找不到已共享裝置。請參考整合文件：{docs_url}"
+    },
+    "abort": {
+      "already_configured": "整合已設定。"
+    }
+  },
+  "entity": {
+    "select": {
+      "alarm_volume": {
+        "name": "警報音量",
+        "state": {
+          "mute": "靜音",
+          "low": "低",
+          "medium": "中",
+          "high": "高"
+        }
+      },
+      "alarm_duration": {
+        "name": "警報時長（分鐘）"
+      },
+      "part_zone": {
+        "name": "防區",
+        "state": {
+          "zone_24h": "24 小時組",
+          "zone_normal": "佈防組",
+          "zone_home": "居家組",
+          "zone_delay": "延時組"
+        }
+      }
+    },
+    "switch": {
+      "arm_disarm_beep": {
+        "name": "佈防/撤防提示音"
+      },
+      "entry_delay_tone": {
+        "name": "進入延時提示音"
+      },
+      "exit_delay_tone": {
+        "name": "離開延時提示音"
+      },
+      "test_mode": {
+        "name": "RF 測試模式"
+      },
+      "part_enabled": {
+        "name": "啟用"
+      },
+      "part_sos": {
+        "name": "SOS 啟用"
+      }
+    },
+    "number": {
+      "entry_delay": {
+        "name": "進入延時（秒）"
+      },
+      "exit_delay": {
+        "name": "離開延時（秒）"
+      }
+    },
+    "binary_sensor": {
+      "accessory_sensor": {
+        "name": "感測器"
+      },
+      "keyfob_sensor": {
+        "name": "鑰匙遙控器"
+      },
+      "ac_power": {
+        "name": "交流電源"
+      }
+    },
+    "sensor": {
+      "firmware_version": {
+        "name": "韌體版本"
+      }
+    },
+    "update": {
+      "firmware_update": {
+        "name": "韌體更新"
+      }
+    },
+    "button": {
+      "refresh_accessories": {
+        "name": "重新整理配件"
+      }
+    },
+    "event": {
+      "alarm_event": {
+        "name": "事件日誌",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "normal_alarm": "警報",
+              "sos": "SOS",
+              "disarmed": "已撤防",
+              "armed": "已佈防",
+              "armed_home": "居家佈防",
+              "tamper": "防拆警報",
+              "low_battery": "電量低",
+              "duress_alarm": "脅迫警報",
+              "offline": "裝置離線",
+              "line_cut": "線路中斷",
+              "ac_power_lost": "交流電中斷",
+              "ac_power_restored": "交流電恢復",
+              "above_limit": "超過上限",
+              "below_limit": "低於下限",
+              "deviation": "偏差",
+              "sensor_triggered": "感測器觸發",
+              "schedule_alarm": "排程警報",
+              "door_open": "門/窗開啟",
+              "door_closed": "門/窗關閉",
+              "smoke_detected": "偵測到煙霧",
+              "alarm_test": "警報測試",
+              "system_fault": "系統故障",
+              "sensor_end_of_life": "感測器壽命到期",
+              "rf_interference": "射頻干擾",
+              "chime": "門鈴提示",
+              "door_unlocked": "門已解鎖"
+            }
+          }
+        }
+      }
+    }
+  }
+}
