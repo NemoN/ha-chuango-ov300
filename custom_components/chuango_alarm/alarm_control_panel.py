@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import DreamcatcherCoordinator
+from .utils import resolve_device_model
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
     coordinator: DreamcatcherCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
@@ -78,7 +79,7 @@ class DreamcatcherAlarmPanel(CoordinatorEntity[DreamcatcherCoordinator], AlarmCo
             identifiers={(DOMAIN, self.device_id)},
             name=alias,
             manufacturer="Chuango",
-            model=dtype or None,
+            model=resolve_device_model(dtype, product_id),
             model_id=str(product_id) if product_id else None,
         )
     

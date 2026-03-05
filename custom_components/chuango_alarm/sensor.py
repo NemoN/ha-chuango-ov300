@@ -29,6 +29,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import DreamcatcherCoordinator
+from .utils import resolve_device_model
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +58,23 @@ DEV_DIAG_DEFS: list[_DevDiagDef] = [
     #_DevDiagDef("device_id", "Device ID (Long)"),
 ]
 
+# Product IDs are based on DreamCatcher APK constants (CGI.kt / CGI.java):
+# ProID_Hub_OV300=3, ProID_Hub_OV300V2=19, ProID_Hub_OV300V2_300=300, ...
+PRODUCT_ID_LABELS: dict[str, str] = {
+    "3": "OV-300 Hub",
+    "19": "OV-300 V2 Hub",
+    "300": "OV-300 V2 Hub (Variant 300)",
+    "5": "LTE-400 Hub",
+    "22": "LTE-400 Hub (Variant 22)",
+    "38": "LTE-400 Hub (Variant 38)",
+    "42": "G5-LTE Alarm",
+}
+
+# dtype codes come from the shared_devices API payload.
+DTYPE_LABELS: dict[str, str] = {
+    "SA": "Security Alarm",
+}
+
 _REFRESH_BEFORE_SECONDS = 12 * 60 * 60  # 12h
 
 
@@ -83,6 +101,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             for d in DEV_DIAG_DEFS:
                 known.add((dev_id, d.key))
                 per_device_entities.append(DreamcatcherDeviceDiagSensor(coordinator, entry, dev_id, d))
+            # Firmware version sensor (data comes via MQTT dev_conf)
+            fw_key = (dev_id, "_fw_version")
+            if fw_key not in known:
+                known.add(fw_key)
+                per_device_entities.append(ChuangoFirmwareVersionSensor(coordinator, entry, dev_id))
 
     async_add_entities(base_entities + per_device_entities)
 
@@ -102,6 +125,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     continue
                 known.add(k)
                 new_entities.append(DreamcatcherDeviceDiagSensor(coordinator, entry, dev_id, d))
+            fw_key = (dev_id, "_fw_version")
+            if fw_key not in known:
+                known.add(fw_key)
+                new_entities.append(ChuangoFirmwareVersionSensor(coordinator, entry, dev_id))
 
         if new_entities:
             hass.async_create_task(platform.async_add_entities(new_entities))
@@ -327,6 +354,71 @@ class DreamcatcherTokenExpireSensor(CoordinatorEntity[DreamcatcherCoordinator], 
 #         }
 
 
+class ChuangoFirmwareVersionSensor(CoordinatorEntity[DreamcatcherCoordinator], SensorEntity):
+    """Sensor showing the WiFi firmware version reported by the OV-300 via MQTT dev_conf."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:chip"
+
+    def __init__(
+        self,
+        coordinator: DreamcatcherCoordinator,
+        entry: ConfigEntry,
+        device_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._entry = entry
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry.entry_id}_{device_id}_firmware_version"
+        self._attr_translation_key = "firmware_version"
+
+    @property
+    def _dev(self) -> dict[str, Any]:
+        return (self.coordinator.data or {}).get("shared_devices", {}).get(self._device_id, {})
+
+    @property
+    def _mqtt_dev_state(self) -> dict[str, Any]:
+        return (self.coordinator.data or {}).get("mqtt_state", {}).get(self._device_id, {})
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        d = self._dev
+        alias = d.get("alias") or self._device_id
+        product_id = d.get("product_id") or d.get("mpid") or ""
+        dtype = d.get("dtype") or ""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=alias,
+            manufacturer="Chuango",
+            model=resolve_device_model(dtype, product_id),
+            model_id=str(product_id) if product_id else None,
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        return self._mqtt_dev_state.get("fw")
+
+    @property
+    def available(self) -> bool:
+        # Available once we have received at least one dev_conf via MQTT
+        return self._mqtt_dev_state.get("fw") is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        st = self._mqtt_dev_state
+        attrs: dict[str, Any] = {}
+        if st.get("tz") is not None:
+            attrs["timezone"] = st["tz"]
+        if st.get("ip_local") is not None:
+            attrs["ip_local"] = st["ip_local"]
+        if st.get("qs_d") is not None:
+            attrs["qs_d"] = st["qs_d"]
+        if st.get("qs_p") is not None:
+            attrs["qs_p"] = st["qs_p"]
+        return attrs
+
+
 class DreamcatcherDeviceDiagSensor(CoordinatorEntity[DreamcatcherCoordinator], SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
@@ -359,7 +451,7 @@ class DreamcatcherDeviceDiagSensor(CoordinatorEntity[DreamcatcherCoordinator], S
             identifiers={(DOMAIN, self._device_id)},
             name=alias,
             manufacturer="Chuango",
-            model=dtype or None,
+            model=resolve_device_model(dtype, product_id),
             model_id=str(product_id) if product_id else None,
         )
 
@@ -436,10 +528,20 @@ class DreamcatcherDeviceDiagSensor(CoordinatorEntity[DreamcatcherCoordinator], S
             return d.get("userAuth")
 
         if k == "dtype":
-            return d.get("dtype")
+            raw = d.get("dtype")
+            if raw is None:
+                return None
+            raw_s = str(raw)
+            label = DTYPE_LABELS.get(raw_s)
+            return f"{raw_s} ({label})" if label else raw_s
 
         if k == "product_id":
-            return d.get("product_id")
+            raw = d.get("product_id")
+            if raw is None:
+                return None
+            raw_s = str(raw)
+            label = PRODUCT_ID_LABELS.get(raw_s)
+            return f"{raw_s} ({label})" if label else raw_s
 
         if k == "dev_id_int":
             return d.get("devIdInt")
@@ -448,8 +550,35 @@ class DreamcatcherDeviceDiagSensor(CoordinatorEntity[DreamcatcherCoordinator], S
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        if self._def.key != "mqtt_token":
-            return None
-        mqtt = (self._dev.get("mqtt") or {})
-        tok = mqtt.get("token")
-        return {"token": tok} if tok else None
+        if self._def.key == "mqtt_token":
+            mqtt = (self._dev.get("mqtt") or {})
+            tok = mqtt.get("token")
+            return {"token": tok} if tok else None
+
+        if self._def.key == "dtype":
+            raw = self._dev.get("dtype")
+            if raw is None:
+                return None
+            raw_s = str(raw)
+            label = DTYPE_LABELS.get(raw_s)
+            attrs: dict[str, Any] = {"raw_dtype": raw_s}
+            if label:
+                attrs["dtype_name"] = label
+            return attrs
+
+        if self._def.key == "product_id":
+            raw = self._dev.get("product_id")
+            if raw is None:
+                return None
+            raw_s = str(raw)
+            label = PRODUCT_ID_LABELS.get(raw_s)
+            attrs = {
+                "raw_product_id": raw_s,
+                "mpid": self._dev.get("mpid"),
+            }
+            if label:
+                attrs["product_name"] = label
+                attrs["mapping_source"] = "DreamCatcher APK CGI.kt constants"
+            return attrs
+
+        return None

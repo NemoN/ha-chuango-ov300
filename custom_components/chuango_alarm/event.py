@@ -15,15 +15,34 @@ from .const import DOMAIN
 from .coordinator import DreamcatcherCoordinator
 
 # itemEvent / iE code → event type string
+# Source: DreamCatcher Life APK – Config.EventEnum
 EVENT_CODE_MAP: dict[int, str] = {
+    10: "normal_alarm",
     11: "sos",
     12: "disarmed",
     13: "armed",
     14: "armed_home",
     15: "tamper",
+    16: "low_battery",
+    17: "duress_alarm",
+    18: "offline",
+    19: "line_cut",
     20: "ac_power_lost",
     21: "ac_power_restored",
+    23: "above_limit",
+    24: "below_limit",
+    25: "deviation",
     26: "sensor_triggered",
+    27: "schedule_alarm",
+    30: "door_open",
+    31: "door_closed",
+    40: "smoke_detected",
+    41: "alarm_test",
+    42: "system_fault",
+    43: "sensor_end_of_life",
+    53: "rf_interference",
+    54: "chime",
+    55: "door_unlocked",
 }
 
 EVENT_TYPES: list[str] = list(EVENT_CODE_MAP.values())

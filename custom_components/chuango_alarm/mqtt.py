@@ -156,6 +156,7 @@ class DreamcatcherMqttManager:
 
         lock = self._get_pub_lock(device_id)
         async with lock:
+            self.coordinator.mark_din_tx(device_id=device_id, topic=topic, payload=payload)
             await client.publish(topic, payload, qos=qos, retain=retain)
 
     async def _device_loop(self, device_id: str) -> None:
@@ -172,6 +173,7 @@ class DreamcatcherMqttManager:
                 password = str(creds["password"])
 
                 topic = self.coordinator.get_mqtt_subscribe_topic(device_id)
+                din_topic = self.coordinator.get_mqtt_din_config_topic(device_id)
 
                 tls_ctx = self._tls
                 if tls_ctx is None:
@@ -190,9 +192,20 @@ class DreamcatcherMqttManager:
 
                 async with client:
                     await client.subscribe(topic)
+                    try:
+                        # Optional subscribe for visibility into commands sent by external clients
+                        # (e.g. DreamCatcher app): smart/<device>/dc/<pid>/din/config
+                        await client.subscribe(din_topic)
+                    except Exception as err:
+                        self._log.debug(
+                            "MQTT optional subscribe failed for %s on %s: %s",
+                            device_id,
+                            din_topic,
+                            err,
+                        )
                     self._log.debug(
-                        "MQTT subscribed for %s: host=%s:%s client_id=%s topic=%s",
-                        device_id, host, port, client_id, topic
+                        "MQTT subscribed for %s: host=%s:%s client_id=%s topics=[%s, %s]",
+                        device_id, host, port, client_id, topic, din_topic
                     )
 
                     # expose connected client for publishes (same connection / client_id)

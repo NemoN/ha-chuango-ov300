@@ -11,6 +11,7 @@ ZONE_PATH = "/v2/server/zone"
 LOGIN_PATH = "/v2/user/login"
 SHARED_DEVICES_PATH = "/v2/user/device/list/shared"
 ALARM_HISTORY_PATH = "/v2/message/list/alarm/device"
+FWINFO_PATH = "/v2/user/device/fwinfo"
 
 CONF_REGION = "region"              # e.g. 'DE'
 CONF_COUNTRY_NAME = "country_name"  # e.g. 'Germany'
@@ -45,4 +46,7 @@ DEFAULT_USER_AGENT = (
     "Dalvik/2.1.0 (Linux; U; Android 14; SM-S911B Build/UP1A.231005.007)"
 )
 
-PLATFORMS = [Platform.SENSOR, Platform.ALARM_CONTROL_PANEL, Platform.SELECT, Platform.SWITCH, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.EVENT]
+# Debounce window for parts_list refresh after modify_parts ACK.
+PARTS_SYNC_COOLDOWN_SECONDS = 4.0
+
+PLATFORMS = [Platform.SENSOR, Platform.ALARM_CONTROL_PANEL, Platform.SELECT, Platform.SWITCH, Platform.NUMBER, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.EVENT, Platform.UPDATE]

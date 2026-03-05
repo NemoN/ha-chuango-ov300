@@ -18,6 +18,7 @@ from .const import (
     DEFAULT_OS_VER,
     DEFAULT_PHONE_BRAND,
     DEFAULT_USER_AGENT,
+    FWINFO_PATH,
     LOGIN_PATH,
     SHARED_DEVICES_PATH,
     ZONE_API_BASE,
@@ -430,6 +431,90 @@ class DreamcatcherApiClient:
         if not isinstance(data, dict):
             raise DreamcatcherApiError(
                 f"Unexpected alarm history response: {truncate(body_text, 300)}"
+            )
+
+        return data
+
+    async def firmware_info(
+        self,
+        *,
+        base_url: str,
+        token: str,
+        device_id_int: int,
+        wifi_version: str,
+        mcu_version: str = "",
+        gsm_version: str = "",
+        gsm_model: str = "",
+    ) -> dict[str, Any]:
+        """Check for firmware updates via the fwinfo REST endpoint.
+
+        GET /v2/user/device/fwinfo?token=...&deviceID=...&wifi=...&mcu&g_v&g_m
+
+        Returns the raw JSON dict with keys: code, fwCount, force, appForce, fwList.
+        """
+        url = f"{base_url}{FWINFO_PATH}"
+        params: dict[str, str] = {
+            "token": token,
+            "deviceID": str(device_id_int),
+            "wifi": wifi_version or "",
+            "mcu": mcu_version or "",
+            "g_v": gsm_version or "",
+            "g_m": gsm_model or "",
+        }
+
+        headers = {
+            "Appversion": DEFAULT_APP_VER,
+            "Platform": DEFAULT_OS,
+            "Lang": DEFAULT_LANG,
+            "Brand": DEFAULT_BRAND_HEADER,
+            "User-Agent": DEFAULT_USER_AGENT,
+        }
+
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(
+                "HTTP REQUEST %s %s\nparams=%s\nheaders=%s",
+                "GET",
+                url,
+                pretty_json(redact_mapping(params)),
+                pretty_json(redact_headers(headers)),
+            )
+
+        try:
+            async with asyncio.timeout(20):
+                resp = await self._session.get(url, params=params, headers=headers)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise DreamcatcherApiError(f"Firmware info connection error: {err}") from err
+
+        async with resp:
+            body_bytes = await resp.read()
+            body_text = body_bytes.decode("utf-8", errors="replace")
+
+            if self._log.isEnabledFor(logging.DEBUG):
+                self._log.debug(
+                    "HTTP RESPONSE %s %s\nstatus=%s\nresp_headers=%s\nbody=%s",
+                    "GET",
+                    str(resp.url),
+                    resp.status,
+                    pretty_json(redact_headers(dict(resp.headers))),
+                    truncate(body_text),
+                )
+
+            if resp.status in (401, 403):
+                raise DreamcatcherAuthError(f"Auth failed ({resp.status}): {truncate(body_text, 300)}")
+
+            if resp.status != 200:
+                raise DreamcatcherApiError(f"HTTP {resp.status}: {truncate(body_text, 300)}")
+
+            try:
+                data = json.loads(body_text)
+            except Exception as err:
+                raise DreamcatcherApiError(
+                    f"Invalid JSON: {err} | body={truncate(body_text, 300)}"
+                ) from err
+
+        if not isinstance(data, dict):
+            raise DreamcatcherApiError(
+                f"Unexpected fwinfo response: {truncate(body_text, 300)}"
             )
 
         return data

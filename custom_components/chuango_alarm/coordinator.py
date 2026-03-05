@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import secrets
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -27,9 +29,13 @@ from .const import (
     CONF_USER_INFO,
     DOMAIN,
     DOCS_URL,
+    PARTS_SYNC_COOLDOWN_SECONDS,
 )
 
 _REFRESH_BEFORE_SECONDS = 12 * 60 * 60  # 12h
+_DIN_DUP_WINDOW_SECONDS = 0.5
+_DIN_ECHO_WINDOW_SECONDS = 2.0
+_EXT_MODIFY_GRACE_SECONDS = 2.0
 
 
 class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -62,6 +68,21 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # runtime: last seen MQTT messages (kept in memory; can be exposed as diagnostics)
         self._mqtt_state: dict[str, dict[str, Any]] = {}
+
+        # runtime: firmware update info per device (populated by REST fwinfo call)
+        self._firmware_info: dict[str, dict[str, Any]] = {}
+
+        # runtime: dedupe tracker for echoed/redelivered din logs (QoS1 can duplicate)
+        self._last_din_rx: dict[str, tuple[str, int, float]] = {}
+
+        # runtime: recently sent din payloads (for self-echo detection)
+        self._last_din_tx: dict[str, tuple[str, int, float]] = {}
+
+        # runtime: last time an external client sent modify_parts (per device)
+        self._last_ext_modify_parts_ts: dict[str, float] = {}
+
+        # runtime: debounced parts sync tasks (per device)
+        self._parts_sync_tasks: dict[str, asyncio.Task] = {}
 
     # ---------- token / persistence ----------
 
@@ -180,12 +201,63 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 f"Please follow the integration documentation: {DOCS_URL}"
             )
 
+        # Check for firmware updates for each device
+        for dev_id, dev in devices_by_id.items():
+            await self._fetch_firmware_info(dev_id, dev)
+
         return {
             "userInfo": self.user_info or {},
             "expireAt": self.expire_at,
             "lastLogin": self.last_login,
             "shared_devices": devices_by_id,
             "mqtt_state": self._mqtt_state,
+            "firmware_info": self._firmware_info,
+        }
+
+    # ---------- firmware update check ----------
+
+    async def _fetch_firmware_info(self, device_id: str, dev: dict[str, Any]) -> None:
+        """Check the fwinfo REST endpoint for available firmware updates."""
+        dev_id_int = dev.get("devIdInt")
+        if not dev_id_int:
+            return
+
+        # Get the dm endpoint for this device
+        dm = dev.get("dm") or {}
+        dm_domain = dm.get("domain")
+        dm_port = dm.get("port")
+        if dm_domain and dm_port:
+            base_url = f"https://{dm_domain}:{dm_port}"
+        else:
+            d = self.entry.data
+            base_url = f"https://{d[CONF_AM_DOMAIN]}:{d[CONF_AM_PORT]}"
+
+        # Use current installed fw version from MQTT state (if available)
+        dev_state = self._mqtt_state.get(device_id) or {}
+        installed_fw = dev_state.get("fw") or ""
+
+        try:
+            result = await self.api.firmware_info(
+                base_url=base_url,
+                token=self.token,
+                device_id_int=int(dev_id_int),
+                wifi_version=installed_fw,
+            )
+        except Exception as err:
+            self.logger.debug("Firmware info check failed for %s: %s", device_id, err)
+            return
+
+        fw_list = result.get("fwList") or []
+        if not isinstance(fw_list, list):
+            fw_list = []
+
+        self._firmware_info[device_id] = {
+            "code": result.get("code"),
+            "fwCount": result.get("fwCount", 0),
+            "force": result.get("force", 0),
+            "appForce": result.get("appForce", 0),
+            "fwList": fw_list,
+            "installed_version": installed_fw or None,
         }
 
     # ---------- device + mqtt helpers ----------
@@ -301,16 +373,133 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ---------- MQTT message ingestion (called by your future MQTT client code) ----------
 
     @callback
+    def mark_din_tx(self, *, device_id: str, topic: str, payload: str | bytes) -> None:
+        """Track outgoing din payloads to classify later din RX as self-echo/external."""
+        if "/din/" not in topic:
+            return
+        try:
+            if isinstance(payload, (bytes, bytearray)):
+                payload_bytes = bytes(payload)
+            else:
+                payload_bytes = str(payload).encode("utf-8", errors="replace")
+            self._last_din_tx[device_id] = (topic, hash(payload_bytes), time.monotonic())
+        except Exception:
+            # best-effort telemetry only
+            return
+
+    def _schedule_parts_sync(self, device_id: str) -> None:
+        """Debounce parts_list refreshes so bursts of modify_parts do not spam device/app."""
+        existing = self._parts_sync_tasks.get(device_id)
+        if existing is not None and not existing.done():
+            existing.cancel()
+
+        self._parts_sync_tasks[device_id] = self.hass.async_create_task(
+            self._parts_sync_after_cooldown(device_id)
+        )
+
+    async def _parts_sync_after_cooldown(self, device_id: str) -> None:
+        try:
+            await asyncio.sleep(PARTS_SYNC_COOLDOWN_SECONDS)
+            await self.async_request_parts_list(device_id, page=1)
+        except asyncio.CancelledError:
+            return
+        except Exception as err:
+            self.logger.debug("Debounced parts sync failed for %s: %s", device_id, err)
+        finally:
+            task = self._parts_sync_tasks.get(device_id)
+            if task is not None and task.done():
+                self._parts_sync_tasks.pop(device_id, None)
+
+    @callback
     def async_process_mqtt_message(self, *, device_id: str, topic: str, payload: bytes) -> None:
         """Parse a device dout message and update in-memory mqtt_state."""
 
-        # Preview fürs Log (lesbar, ohne Formatfehler)
+        # Full payload for debug log
         try:
-            preview = payload[:200].decode("utf-8", errors="replace")
+            preview = payload.decode("utf-8", errors="replace")
         except Exception:
-            preview = repr(payload[:200])
+            preview = repr(payload)
 
-        self.logger.debug("MQTT RX dev=%s topic=%s payload=%s", device_id, topic, preview)
+        # We also subscribe to din/config for debugging external clients.
+        # Log it with a dedicated prefix and do not treat din traffic as state updates.
+        if "/din/" in topic:
+            now_mono = time.monotonic()
+            payload_hash = hash(payload)
+            last = self._last_din_rx.get(device_id)
+            if last is not None:
+                last_topic, last_hash, last_ts = last
+                if last_topic == topic and last_hash == payload_hash and (now_mono - last_ts) <= _DIN_DUP_WINDOW_SECONDS:
+                    return
+            self._last_din_rx[device_id] = (topic, payload_hash, now_mono)
+
+            src = "EXT"
+            tx = self._last_din_tx.get(device_id)
+            if tx is not None:
+                tx_topic, tx_hash, tx_ts = tx
+                if tx_topic == topic and tx_hash == payload_hash and (now_mono - tx_ts) <= _DIN_ECHO_WINDOW_SECONDS:
+                    src = "ECHO"
+
+            self.logger.debug("MQTT RX DIN %s dev=%s topic=%s payload=%s", src, device_id, topic, preview)
+
+            # If an external client modifies parts (e.g. app), update local parts state directly
+            # to avoid immediate parts_list polling bursts that can cause UI flicker.
+            if src == "EXT":
+                data = self._safe_json(payload)
+                m = data.get("m") if isinstance(data, dict) else None
+                req = m.get("req") if isinstance(m, dict) else None
+                if isinstance(req, dict) and req.get("a") == "modify_parts":
+                    self._last_ext_modify_parts_ts[device_id] = now_mono
+                    req_parts = req.get("parts")
+                    if isinstance(req_parts, list):
+                        dev_state = dict(self._mqtt_state.get(device_id) or {})
+                        parts_state = list(dev_state.get("parts") or [])
+                        changed = False
+
+                        for req_part in req_parts:
+                            if not isinstance(req_part, dict):
+                                continue
+                            part_id = req_part.get("id")
+                            if part_id is None:
+                                continue
+
+                            for idx, existing_part in enumerate(parts_state):
+                                if not isinstance(existing_part, dict):
+                                    continue
+                                if existing_part.get("id") != part_id:
+                                    continue
+
+                                updated = dict(existing_part)
+                                for key, value in req_part.items():
+                                    if key == "id":
+                                        continue
+                                    updated[key] = value
+
+                                # Keep c bitfield status in sync if e was modified.
+                                if "e" in req_part and updated.get("c") is not None:
+                                    try:
+                                        c_int = int(updated.get("c"))
+                                        if int(req_part.get("e")) == 1:
+                                            c_int = c_int | 0x80
+                                        else:
+                                            c_int = c_int & 0x7F
+                                        updated["c"] = c_int
+                                    except (TypeError, ValueError):
+                                        pass
+
+                                parts_state[idx] = updated
+                                changed = True
+                                break
+
+                        if changed:
+                            dev_state["parts"] = parts_state
+                            self._mqtt_state[device_id] = dev_state
+                            cur = dict(self.data or {})
+                            cur["mqtt_state"] = dict(self._mqtt_state)
+                            cur["firmware_info"] = dict(self._firmware_info)
+                            self.async_set_updated_data(cur)
+            return
+
+        self.logger.debug("MQTT RX DOUT dev=%s topic=%s payload=%s", device_id, topic, preview)
 
         data = self._safe_json(payload)
 
@@ -337,6 +526,7 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     dev_state["alarm"] = res.get("alarm")   # 0/1
                     dev_state["trig"] = res.get("trig")
                     dev_state["power"] = res.get("power")
+                    dev_state["test_mode"] = res.get("test")
                     dev_state["time"] = res.get("time")
                 if action == "host_conf":
                     is_conf = res.get("IS")
@@ -344,6 +534,12 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         dev_state["alarm_volume"] = is_conf.get("v")
                         dev_state["arm_beep"] = is_conf.get("t")
                         dev_state["alarm_duration"] = is_conf.get("tm")
+                    delay_conf = res.get("delay")
+                    if isinstance(delay_conf, dict):
+                        dev_state["exit_delay"] = delay_conf.get("o")
+                        dev_state["exit_delay_tone"] = delay_conf.get("ot")
+                        dev_state["entry_delay"] = delay_conf.get("i")
+                        dev_state["entry_delay_tone"] = delay_conf.get("it")
 
         # Info
         if topic.endswith("/dout/info") and isinstance(data, dict):
@@ -373,6 +569,14 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         self.hass.async_create_task(
                             self.async_request_parts_list(device_id, page=next_page)
                         )
+                if action == "modify_parts":
+                    # ACK only; state updates come from optimistic local update or DIN EXT processing.
+                    self._last_din_tx.pop(device_id, None)
+                    now_mono = time.monotonic()
+                    ext_ts = self._last_ext_modify_parts_ts.get(device_id, 0.0)
+                    if (now_mono - ext_ts) > _EXT_MODIFY_GRACE_SECONDS:
+                        self._schedule_parts_sync(device_id)
+                    pass
 
         # Alarm events (who changed the mode) -> changed_by
         if topic.endswith("/dout/alarm") and isinstance(data, dict):
@@ -437,6 +641,7 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Update coordinator.data sofort (Push-Update)
         cur = dict(self.data or {})
         cur["mqtt_state"] = dict(self._mqtt_state)
+        cur["firmware_info"] = dict(self._firmware_info)
 
         self.async_set_updated_data(cur)
 
@@ -488,6 +693,271 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         mqtt = runtime.get("mqtt")
         if mqtt is None:
             raise HomeAssistantError("MQTT manager not available")
+
+        self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
+        await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
+
+    async def async_send_host_conf_delay(
+        self,
+        device_id: str,
+        *,
+        exit_delay: int | None = None,
+        exit_delay_tone: int | None = None,
+        entry_delay: int | None = None,
+        entry_delay_tone: int | None = None,
+    ) -> None:
+        """Send host_conf delay changes via MQTT.
+
+        delay fields:
+        - o: exit delay seconds (0..300)
+        - ot: exit delay tone (0/1)
+        - i: entry delay seconds (0..300)
+        - it: entry delay tone (0/1)
+        """
+        dev_state = self._mqtt_state.get(device_id) or {}
+
+        cur_o = dev_state.get("exit_delay", 0)
+        cur_ot = dev_state.get("exit_delay_tone", 1)
+        cur_i = dev_state.get("entry_delay", 0)
+        cur_it = dev_state.get("entry_delay_tone", 1)
+
+        try:
+            o = int(exit_delay if exit_delay is not None else cur_o)
+            ot = int(exit_delay_tone if exit_delay_tone is not None else cur_ot)
+            i = int(entry_delay if entry_delay is not None else cur_i)
+            it = int(entry_delay_tone if entry_delay_tone is not None else cur_it)
+        except (TypeError, ValueError) as err:
+            raise HomeAssistantError(f"Invalid delay payload: {err}") from err
+
+        o = max(0, min(300, o))
+        i = max(0, min(300, i))
+        ot = 1 if ot else 0
+        it = 1 if it else 0
+
+        topic = self.get_mqtt_din_config_topic(device_id)
+        payload_obj = {
+            "m": {
+                "req": {
+                    "a": "host_conf",
+                    "delay": {
+                        "o": o,
+                        "ot": ot,
+                        "i": i,
+                        "it": it,
+                    },
+                }
+            }
+        }
+        payload = json.dumps(payload_obj, separators=(",", ":"), ensure_ascii=False)
+
+        runtime = (self.hass.data.get(DOMAIN) or {}).get(self.entry.entry_id) or {}
+        mqtt = runtime.get("mqtt")
+        if mqtt is None:
+            raise HomeAssistantError("MQTT manager not available")
+
+        self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
+        await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
+
+    async def async_send_test_mode(self, device_id: str, enabled: bool) -> None:
+        """Enable/disable accessories RF test mode via host_stat.test (1/0)."""
+        topic = self.get_mqtt_din_config_topic(device_id)
+        payload_obj = {
+            "m": {
+                "req": {
+                    "a": "host_stat",
+                    "test": 1 if enabled else 0,
+                }
+            }
+        }
+        payload = json.dumps(payload_obj, separators=(",", ":"), ensure_ascii=False)
+
+        runtime = (self.hass.data.get(DOMAIN) or {}).get(self.entry.entry_id) or {}
+        mqtt = runtime.get("mqtt")
+        if mqtt is None:
+            raise HomeAssistantError("MQTT manager not available")
+
+        self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
+        await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
+
+    async def async_send_modify_part_zone(self, device_id: str, part_id: int, zone: int) -> None:
+        """Set a part/accessory zone via modify_parts.
+
+        Zone values:
+        - 0 = 24h
+        - 1 = Normal
+        - 2 = Home
+        - 3 = Delay
+        """
+        if zone not in (0, 1, 2, 3):
+            raise HomeAssistantError(f"Unsupported zone value: {zone}")
+
+        topic = self.get_mqtt_din_config_topic(device_id)
+        payload_obj = {
+            "m": {
+                "req": {
+                    "a": "modify_parts",
+                    "parts": [
+                        {
+                            "id": int(part_id),
+                            "z": int(zone),
+                        }
+                    ],
+                }
+            }
+        }
+        payload = json.dumps(payload_obj, separators=(",", ":"), ensure_ascii=False)
+
+        runtime = (self.hass.data.get(DOMAIN) or {}).get(self.entry.entry_id) or {}
+        mqtt = runtime.get("mqtt")
+        if mqtt is None:
+            raise HomeAssistantError("MQTT manager not available")
+
+        # Optimistic local update so UI reflects the selection immediately
+        dev_state = dict(self._mqtt_state.get(device_id) or {})
+        parts = list(dev_state.get("parts") or [])
+        changed = False
+        for index, part in enumerate(parts):
+            if not isinstance(part, dict):
+                continue
+            if part.get("id") == part_id:
+                updated = dict(part)
+                updated["z"] = int(zone)
+                parts[index] = updated
+                changed = True
+                break
+
+        if changed:
+            dev_state["parts"] = parts
+            self._mqtt_state[device_id] = dev_state
+            cur = dict(self.data or {})
+            cur["mqtt_state"] = dict(self._mqtt_state)
+            cur["firmware_info"] = dict(self._firmware_info)
+            self.async_set_updated_data(cur)
+
+        self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
+        await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
+
+    async def async_send_modify_part_enabled(self, device_id: str, part_id: int, enabled: bool) -> None:
+        """Enable/disable a part/accessory via modify_parts.
+
+        Important:
+        Field observations from live device logs show:
+        - e=0 -> disabled (off)
+        - e=1 -> enabled (on)
+        """
+        e_value = 1 if enabled else 0
+
+        topic = self.get_mqtt_din_config_topic(device_id)
+        payload_obj = {
+            "m": {
+                "req": {
+                    "a": "modify_parts",
+                    "parts": [
+                        {
+                            "id": int(part_id),
+                            "e": int(e_value),
+                        }
+                    ],
+                }
+            }
+        }
+        payload = json.dumps(payload_obj, separators=(",", ":"), ensure_ascii=False)
+
+        runtime = (self.hass.data.get(DOMAIN) or {}).get(self.entry.entry_id) or {}
+        mqtt = runtime.get("mqtt")
+        if mqtt is None:
+            raise HomeAssistantError("MQTT manager not available")
+
+        # Optimistic local update so UI reflects the switch immediately
+        dev_state = dict(self._mqtt_state.get(device_id) or {})
+        parts = list(dev_state.get("parts") or [])
+        changed = False
+        for index, part in enumerate(parts):
+            if not isinstance(part, dict):
+                continue
+            if part.get("id") == part_id:
+                updated = dict(part)
+                updated["e"] = int(e_value)
+
+                # Keep c bitfield in sync when present (status bit is bit 7).
+                c_val = updated.get("c")
+                if c_val is not None:
+                    try:
+                        c_int = int(c_val)
+                        if enabled:
+                            c_int = c_int | 0x80
+                        else:
+                            c_int = c_int & 0x7F
+                        updated["c"] = c_int
+                    except (ValueError, TypeError):
+                        pass
+
+                parts[index] = updated
+                changed = True
+                break
+
+        if changed:
+            dev_state["parts"] = parts
+            self._mqtt_state[device_id] = dev_state
+            cur = dict(self.data or {})
+            cur["mqtt_state"] = dict(self._mqtt_state)
+            cur["firmware_info"] = dict(self._firmware_info)
+            self.async_set_updated_data(cur)
+
+        self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
+        await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
+
+    async def async_send_modify_part_sos(self, device_id: str, part_id: int, sos_enabled: bool) -> None:
+        """Enable/disable SOS for a keyfob/remote via modify_parts.ss.
+
+        Observed/expected mapping:
+        - ss=0 -> SOS disabled
+        - ss=1 -> SOS enabled
+        """
+        ss_value = 1 if sos_enabled else 0
+
+        topic = self.get_mqtt_din_config_topic(device_id)
+        payload_obj = {
+            "m": {
+                "req": {
+                    "a": "modify_parts",
+                    "parts": [
+                        {
+                            "id": int(part_id),
+                            "ss": int(ss_value),
+                        }
+                    ],
+                }
+            }
+        }
+        payload = json.dumps(payload_obj, separators=(",", ":"), ensure_ascii=False)
+
+        runtime = (self.hass.data.get(DOMAIN) or {}).get(self.entry.entry_id) or {}
+        mqtt = runtime.get("mqtt")
+        if mqtt is None:
+            raise HomeAssistantError("MQTT manager not available")
+
+        # Optimistic local update so UI reflects the switch immediately
+        dev_state = dict(self._mqtt_state.get(device_id) or {})
+        parts = list(dev_state.get("parts") or [])
+        changed = False
+        for index, part in enumerate(parts):
+            if not isinstance(part, dict):
+                continue
+            if part.get("id") == part_id:
+                updated = dict(part)
+                updated["ss"] = int(ss_value)
+                parts[index] = updated
+                changed = True
+                break
+
+        if changed:
+            dev_state["parts"] = parts
+            self._mqtt_state[device_id] = dev_state
+            cur = dict(self.data or {})
+            cur["mqtt_state"] = dict(self._mqtt_state)
+            cur["firmware_info"] = dict(self._firmware_info)
+            self.async_set_updated_data(cur)
 
         self.logger.debug("MQTT TX dev=%s topic=%s payload=%s", device_id, topic, payload)
         await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
@@ -572,4 +1042,5 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Push update
         cur = dict(self.data or {})
         cur["mqtt_state"] = dict(self._mqtt_state)
+        cur["firmware_info"] = dict(self._firmware_info)
         self.async_set_updated_data(cur)

@@ -14,10 +14,19 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import DreamcatcherCoordinator
+from .utils import part_md_label, part_zone_change_allowed, resolve_device_model
 
-# Category 129 = sensors (door/window/PIR), category 130 = key fobs / remotes
-CATEGORY_SENSOR = 129
-CATEGORY_KEYFOB = 130
+# c-bitfield decoding (APK: partDataBean.PartsBean.setC)
+# - mtype   = c & 0x0F
+# - mstatus = c >> 7 (bit 7)
+MTYPE_SENSOR = 1
+MTYPE_KEYFOB = 2
+
+# Observed part `t` values in OV-300 payloads
+PART_T_LABELS: dict[int, str] = {
+    44: "Remote / Keyfob",
+    45: "Sensor (generic)",
+}
 
 # Zone mapping: z=1 -> perimeter (instant), z=2 -> interior (delay/PIR)
 ZONE_PERIMETER = 1
@@ -25,9 +34,14 @@ ZONE_INTERIOR = 2
 
 
 def _infer_device_class(part: dict[str, Any]) -> BinarySensorDeviceClass:
-    """Infer device class from part name and zone."""
+    """Infer device class from decoded part type + name/zone."""
     name = (part.get("n") or "").lower()
     zone = part.get("z")
+    mtype, _mstatus, _enabled = _decode_part_c(part)
+
+    # Key fob / remote
+    if mtype == MTYPE_KEYFOB:
+        return BinarySensorDeviceClass.PRESENCE
 
     # PIR / motion sensors
     if "pir" in name or zone == ZONE_INTERIOR:
@@ -61,14 +75,44 @@ def _zone_label(zone: int | None) -> str:
 
 
 def _model_from_part(part: dict[str, Any]) -> str:
-    """Derive a model string from part category and type."""
+    """Derive a model string from decoded c-bitfield type and raw type t."""
     c = part.get("c")
     t = part.get("t")
-    if c == CATEGORY_SENSOR:
+    mtype, _mstatus, _enabled = _decode_part_c(part)
+    if mtype == MTYPE_SENSOR:
         return "Sensor"
-    if c == CATEGORY_KEYFOB:
+    if mtype == MTYPE_KEYFOB:
         return "Key Fob"
+    t_label = _part_t_label(part.get("t"))
+    if t_label:
+        return t_label
     return f"Accessory (c={c}, t={t})"
+
+
+def _decode_part_c(part: dict[str, Any]) -> tuple[int | None, int | None, bool | None]:
+    """Decode c bitfield into (mtype, mstatus, enabled).
+
+    mtype: lower 4 bits
+    mstatus: bit 7 (0/1)
+    enabled: derived from mstatus (1 => enabled)
+    """
+    c_raw = part.get("c")
+    try:
+        c_int = int(c_raw)
+    except (TypeError, ValueError):
+        return None, None, None
+
+    mtype = c_int & 0x0F
+    mstatus = (c_int >> 7) & 0x01
+    enabled = mstatus == 1
+    return mtype, mstatus, enabled
+
+
+def _part_t_label(value: Any) -> str | None:
+    try:
+        return PART_T_LABELS.get(int(value))
+    except (TypeError, ValueError):
+        return None
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
@@ -114,12 +158,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     continue
                 known.add(uid)
 
-                cat = part.get("c")
-                if cat == CATEGORY_SENSOR:
+                mtype, _mstatus, _enabled = _decode_part_c(part)
+                if mtype == MTYPE_SENSOR:
                     entities.append(
                         ChuangoAccessorySensor(coordinator, entry, dev_id, part)
                     )
-                elif cat == CATEGORY_KEYFOB:
+                elif mtype == MTYPE_KEYFOB:
                     entities.append(
                         ChuangoKeyfobSensor(coordinator, entry, dev_id, part)
                     )
@@ -209,14 +253,32 @@ class ChuangoAccessorySensor(CoordinatorEntity[DreamcatcherCoordinator], BinaryS
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        mtype, mstatus, enabled = _decode_part_c(self._part)
+        t_raw = self._part.get("t")
+        md_raw = self._part.get("md")
+        z_raw = self._part.get("z")
+        try:
+            md = int(md_raw) if md_raw is not None else None
+        except (TypeError, ValueError):
+            md = None
+        try:
+            zone = int(z_raw) if z_raw is not None else None
+        except (TypeError, ValueError):
+            zone = None
         return {
             "part_id": self._part.get("id"),
             "sensor_index": self._part.get("si"),
             "category": self._part.get("c"),
-            "type": self._part.get("t"),
-            "zone": self._part.get("z"),
-            "zone_label": _zone_label(self._part.get("z")),
-            "mode": self._part.get("md"),
+            "mtype": mtype,
+            "mstatus": mstatus,
+            "enabled": enabled,
+            "type": t_raw,
+            "type_label": _part_t_label(t_raw),
+            "zone": z_raw,
+            "zone_label": _zone_label(zone),
+            "mode": md_raw,
+            "mode_label": part_md_label(md),
+            "zone_change_allowed": part_zone_change_allowed(md, zone),
         }
 
 
@@ -283,12 +345,33 @@ class ChuangoKeyfobSensor(CoordinatorEntity[DreamcatcherCoordinator], BinarySens
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        mtype, mstatus, enabled = _decode_part_c(self._part)
+        t_raw = self._part.get("t")
+        md_raw = self._part.get("md")
+        z_raw = self._part.get("z")
+        try:
+            md = int(md_raw) if md_raw is not None else None
+        except (TypeError, ValueError):
+            md = None
+        try:
+            zone = int(z_raw) if z_raw is not None else None
+        except (TypeError, ValueError):
+            zone = None
         return {
             "part_id": self._part.get("id"),
             "sensor_index": self._part.get("si"),
             "category": self._part.get("c"),
-            "type": self._part.get("t"),
+            "mtype": mtype,
+            "mstatus": mstatus,
+            "enabled": enabled,
+            "type": t_raw,
+            "type_label": _part_t_label(t_raw),
             "status": self._part.get("ss"),
+            "mode": md_raw,
+            "mode_label": part_md_label(md),
+            "zone": z_raw,
+            "zone_label": _zone_label(zone),
+            "zone_change_allowed": part_zone_change_allowed(md, zone),
         }
 
 
@@ -319,7 +402,7 @@ class ChuangoAcPowerSensor(CoordinatorEntity[DreamcatcherCoordinator], BinarySen
             identifiers={(DOMAIN, self._device_id)},
             name=alias,
             manufacturer="Chuango",
-            model=dtype or None,
+            model=resolve_device_model(dtype, product_id),
             model_id=str(product_id) if product_id else None,
         )
 

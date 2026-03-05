@@ -35,11 +35,43 @@
       },
       "alarm_duration": {
         "name": "Alarm Duration (Minutes)"
+      },
+      "part_zone": {
+        "name": "Zone",
+        "state": {
+          "zone_24h": "24h Group",
+          "zone_normal": "Armed Group",
+          "zone_home": "Home Group",
+          "zone_delay": "Delay Group"
+        }
       }
     },
     "switch": {
       "arm_disarm_beep": {
         "name": "Arm/Disarm Beep"
+      },
+      "entry_delay_tone": {
+        "name": "Entry Delay Tone"
+      },
+      "exit_delay_tone": {
+        "name": "Exit Delay Tone"
+      },
+      "test_mode": {
+        "name": "RF Test Mode"
+      },
+      "part_enabled": {
+        "name": "Enabled"
+      },
+      "part_sos": {
+        "name": "SOS Enabled"
+      }
+    },
+    "number": {
+      "entry_delay": {
+        "name": "Entry Delay (Seconds)"
+      },
+      "exit_delay": {
+        "name": "Exit Delay (Seconds)"
       }
     },
     "binary_sensor": {
@@ -53,6 +85,16 @@
         "name": "AC Power"
       }
     },
+    "sensor": {
+      "firmware_version": {
+        "name": "Firmware Version"
+      }
+    },
+    "update": {
+      "firmware_update": {
+        "name": "Firmware Update"
+      }
+    },
     "button": {
       "refresh_accessories": {
         "name": "Refresh Accessories"
@@ -64,14 +106,32 @@
         "state_attributes": {
           "event_type": {
             "state": {
+              "normal_alarm": "Alarm",
               "sos": "SOS",
               "disarmed": "Disarmed",
               "armed": "Armed",
               "armed_home": "Armed Home",
               "tamper": "Tamper Alarm",
+              "low_battery": "Low Battery",
+              "duress_alarm": "Duress Alarm",
+              "offline": "Device Offline",
+              "line_cut": "Line Cut",
               "ac_power_lost": "AC Power Lost",
               "ac_power_restored": "AC Power Restored",
-              "sensor_triggered": "Sensor Triggered"
+              "above_limit": "Above Limit",
+              "below_limit": "Below Limit",
+              "deviation": "Deviation",
+              "sensor_triggered": "Sensor Triggered",
+              "schedule_alarm": "Schedule Alarm",
+              "door_open": "Door/Window Open",
+              "door_closed": "Door/Window Closed",
+              "smoke_detected": "Smoke Detected",
+              "alarm_test": "Alarm Test",
+              "system_fault": "System Fault",
+              "sensor_end_of_life": "Sensor End of Life",
+              "rf_interference": "RF Interference",
+              "chime": "Chime",
+              "door_unlocked": "Door Unlocked"
             }
           }
         }

@@ -33,6 +33,18 @@ Home Assistant integration for **Chuango OV-300** WiFi alarm systems via the Dre
 | [OV-300](https://chuango.de/en/products/smart-wifi-alarm-system-ov-300) | Tested |
 | [LTE-400](https://chuango.de/en/products/wifi-4g-alarm-system-lte-400) | Untested |
 
+### Product IDs
+
+| Product ID | Model |
+|------------|-------|
+| `3` | OV-300 Hub |
+| `19` | OV-300 V2 Hub |
+| `300` | OV-300 V2 Hub (Variant 300) |
+| `5` | LTE-400 Hub |
+| `22` | LTE-400 Hub (Variant 22) |
+| `38` | LTE-400 Hub (Variant 38) |
+| `42` | G5-LTE Alarm |
+
 ## Testers Wanted
 
 Testers for other Chuango WiFi alarm systems are wanted.  
@@ -128,7 +140,7 @@ Accessories paired with the alarm panel are automatically discovered and appear 
 
 | Entity | Type | Description |
 |--------|------|-------------|
-| `event.<device>_event_log` | Event | Live alarm events (arm/disarm, SOS, tamper, power, sensor trigger) |
+| `event.<device>_event_log` | Event | Live alarm events (arm/disarm, SOS, tamper, power, smoke, door, battery, system faults) |
 
 The event entity fires on every alarm event received via MQTT. Historical events from the cloud API are available in the entity's `history` attribute.
 
@@ -201,14 +213,29 @@ type: markdown
 title: Alarm History
 content: >-
   {% set icons = {
+    'normal_alarm': '🔔',
     'disarmed': '🔓',
     'armed': '🔒',
     'armed_home': '🏠',
     'sos': '🆘',
     'tamper': '⚠️',
+    'low_battery': '🪫',
+    'duress_alarm': '🚨',
+    'offline': '📴',
+    'line_cut': '✂️',
     'ac_power_lost': '🔋',
     'ac_power_restored': '🔌',
-    'sensor_triggered': '🚨'
+    'sensor_triggered': '🚨',
+    'schedule_alarm': '⏰',
+    'door_open': '🚪',
+    'door_closed': '🚪',
+    'smoke_detected': '💨',
+    'alarm_test': '🧪',
+    'system_fault': '⚙️',
+    'sensor_end_of_life': '🔧',
+    'rf_interference': '📡',
+    'chime': '🔔',
+    'door_unlocked': '🔑'
   } %}
   {% set history = state_attr('event.ov_300_event_log', 'history') %}
   {% if history %}
@@ -257,35 +284,7 @@ logger:
 
 ## Changelog
 
-### 0.4.1
-
-- **Translations**: Added `strings.json` for proper translation support; entity names now correctly translate based on HA system language
-- **Live event delivery**: Alarm events are now delivered immediately via HA dispatcher signals instead of coordinator updates, fixing missed or delayed events
-- **Live event history**: Live MQTT alarm events are now appended to the history attribute in real-time
-- **Screenshots**: Added device page screenshots (English & German) to README
-
-### 0.4.0
-
-- **Event log**: Live alarm events (arm/disarm, SOS, tamper, power, sensor trigger) as event entity with cloud history
-- **AC power status**: Binary sensor showing mains/battery power state
-- **Dashboard card**: Markdown card example for alarm history display
-
-### 0.3.0
-
-- **Alarm settings**: Configure alarm volume (mute/low/medium/high), alarm duration (1–5 min), and arm/disarm beep on/off
-- **Accessories as sub-devices**: Door, window, PIR sensors and key fobs appear as sub-devices beneath the alarm panel
-- **Refresh accessories**: Manual button to refresh the accessories list, plus automatic refresh every 24 hours
-- **Triggered-by tracking**: Shows which sensor or user triggered the alarm (including SOS)
-- **Improved shutdown**: Clean integration shutdown without errors
-
-### 0.2.3
-
-- Initial public release
-- Alarm control panel (arm away, arm home, disarm)
-- Real-time status updates
-- User attribution (who changed the alarm state)
-- Diagnostic sensors (user, token expiration, device info)
-- Multi-region support
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
@@ -331,6 +330,18 @@ Home Assistant Integration für **Chuango OV-300** WLAN-Alarmanlagen über den D
 |--------|--------|
 | [OV-300](https://chuango.de/products/smart-wifi-alarm-system-ov-300) | Getestet |
 | [LTE-400](https://chuango.de/products/wifi-4g-alarm-system-lte-400) | Ungetestet |
+
+### Produkt-IDs
+
+| Produkt-ID | Modell |
+|------------|--------|
+| `3` | OV-300 Hub |
+| `19` | OV-300 V2 Hub |
+| `300` | OV-300 V2 Hub (Variante 300) |
+| `5` | LTE-400 Hub |
+| `22` | LTE-400 Hub (Variante 22) |
+| `38` | LTE-400 Hub (Variante 38) |
+| `42` | G5-LTE Alarm |
 
 ## Tester Gesucht
 
@@ -469,14 +480,29 @@ type: markdown
 title: Alarm-Verlauf
 content: >-
   {% set icons = {
+    'normal_alarm': '🔔',
     'disarmed': '🔓',
     'armed': '🔒',
     'armed_home': '🏠',
     'sos': '🆘',
     'tamper': '⚠️',
+    'low_battery': '🪫',
+    'duress_alarm': '🚨',
+    'offline': '📴',
+    'line_cut': '✂️',
     'ac_power_lost': '🔋',
     'ac_power_restored': '🔌',
-    'sensor_triggered': '🚨'
+    'sensor_triggered': '🚨',
+    'schedule_alarm': '⏰',
+    'door_open': '🚪',
+    'door_closed': '🚪',
+    'smoke_detected': '💨',
+    'alarm_test': '🧪',
+    'system_fault': '⚙️',
+    'sensor_end_of_life': '🔧',
+    'rf_interference': '📡',
+    'chime': '🔔',
+    'door_unlocked': '🔑'
   } %}
   {% set history = state_attr('event.ov_300_event_log', 'history') %}
   {% if history %}
@@ -525,35 +551,7 @@ logger:
 
 ## Änderungsprotokoll
 
-### 0.4.1
-
-- **Übersetzungen**: `strings.json` für korrektes Übersetzungssystem hinzugefügt; Entity-Namen werden nun korrekt anhand der HA-Systemsprache übersetzt
-- **Live-Event-Zustellung**: Alarm-Events werden jetzt sofort per HA-Dispatcher-Signal ausgeliefert statt über Coordinator-Updates, wodurch fehlende oder verzögerte Events behoben werden
-- **Live-Event-Historie**: Live-MQTT-Alarm-Events werden nun in Echtzeit in das History-Attribut geschrieben
-- **Screenshots**: Geräteseiten-Screenshots (Englisch & Deutsch) zur README hinzugefügt
-
-### 0.4.0
-
-- **Ereignisprotokoll**: Live-Alarm-Events (Scharf/Unscharf, SOS, Manipulation, Strom, Sensor) als Event-Entität mit Cloud-Historie
-- **Netzstrom-Status**: Binary Sensor zeigt Netz-/Batteriebetrieb an
-- **Dashboard-Karte**: Markdown-Karte für die Alarm-Verlaufsanzeige
-
-### 0.3.0
-
-- **Alarm-Einstellungen**: Alarmlautstärke (Stumm/Niedrig/Mittel/Laut), Alarmdauer (1–5 Min.) und Piepton Scharf/Unscharf konfigurierbar
-- **Zubehör als Untergeräte**: Tür-, Fenster-, PIR-Sensoren und Schlüssel erscheinen als Untergeräte unter der Alarmanlage
-- **Zubehör aktualisieren**: Manueller Button zum Aktualisieren der Zubehörliste, plus automatische Aktualisierung alle 24 Stunden
-- **Auslöser-Nachverfolgung**: Zeigt an, welcher Sensor oder Benutzer den Alarm ausgelöst hat (inkl. SOS)
-- **Verbesserter Shutdown**: Sauberes Beenden der Integration ohne Fehlermeldungen
-
-### 0.2.3
-
-- Erste öffentliche Veröffentlichung
-- Alarm-Zentrale (Scharf Abwesend, Scharf Zuhause, Unscharf)
-- Echtzeit-Statusaktualisierung
-- Benutzer-Zuordnung (wer hat den Alarmzustand geändert)
-- Diagnosesensoren (Benutzer, Token-Ablauf, Geräteinfo)
-- Multi-Region-Unterstützung
+Siehe [CHANGELOG.md](CHANGELOG.md).
 
 ## Mitwirken
 

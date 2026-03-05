@@ -35,11 +35,43 @@
       },
       "alarm_duration": {
         "name": "Alarmdauer (Minuten)"
+      },
+      "part_zone": {
+        "name": "Zone",
+        "state": {
+          "zone_24h": "24-Stunden-Gruppe",
+          "zone_normal": "Scharfe Gruppe",
+          "zone_home": "Home Gruppe",
+          "zone_delay": "Verzögerungsgruppe"
+        }
       }
     },
     "switch": {
       "arm_disarm_beep": {
         "name": "Piepton Scharf/Unscharf"
+      },
+      "entry_delay_tone": {
+        "name": "Eingangsverzögerungston"
+      },
+      "exit_delay_tone": {
+        "name": "Ausgangsverzögerungston"
+      },
+      "test_mode": {
+        "name": "RF-Testmodus"
+      },
+      "part_enabled": {
+        "name": "Aktiviert"
+      },
+      "part_sos": {
+        "name": "SOS aktiviert"
+      }
+    },
+    "number": {
+      "entry_delay": {
+        "name": "Eingangsverzögerung (Sekunden)"
+      },
+      "exit_delay": {
+        "name": "Ausgangsverzögerung (Sekunden)"
       }
     },
     "binary_sensor": {
@@ -53,6 +85,16 @@
         "name": "Netzstrom"
       }
     },
+    "sensor": {
+      "firmware_version": {
+        "name": "Firmware-Version"
+      }
+    },
+    "update": {
+      "firmware_update": {
+        "name": "Firmware-Update"
+      }
+    },
     "button": {
       "refresh_accessories": {
         "name": "Zubehör aktualisieren"
@@ -64,14 +106,32 @@
         "state_attributes": {
           "event_type": {
             "state": {
+              "normal_alarm": "Alarm",
               "sos": "SOS",
               "disarmed": "Unscharf",
               "armed": "Scharf",
               "armed_home": "Teilscharf (Home)",
               "tamper": "Manipulationsalarm",
+              "low_battery": "Batterie schwach",
+              "duress_alarm": "Überfallalarm",
+              "offline": "Gerät offline",
+              "line_cut": "Leitung unterbrochen",
               "ac_power_lost": "Vom Strom getrennt",
               "ac_power_restored": "Mit Strom verbunden",
-              "sensor_triggered": "Sensor ausgelöst"
+              "above_limit": "Obergrenze überschritten",
+              "below_limit": "Untergrenze unterschritten",
+              "deviation": "Abweichung",
+              "sensor_triggered": "Sensor ausgelöst",
+              "schedule_alarm": "Zeitplan-Alarm",
+              "door_open": "Tür/Fenster offen",
+              "door_closed": "Tür/Fenster geschlossen",
+              "smoke_detected": "Rauch erkannt",
+              "alarm_test": "Alarm-Test",
+              "system_fault": "Systemfehler",
+              "sensor_end_of_life": "Sensor-Lebensdauer abgelaufen",
+              "rf_interference": "Funkstörung",
+              "chime": "Gong",
+              "door_unlocked": "Tür entriegelt"
             }
           }
         }
