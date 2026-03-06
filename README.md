@@ -135,6 +135,7 @@ Accessories paired with the alarm panel are automatically discovered and appear 
 | Entity | Type | Description |
 |--------|------|-------------|
 | `button.<device>_refresh_accessories` | Button | Manually refresh accessories list |
+| `button.<device>_sos_alarm` | Button | Trigger SOS alarm |
 
 ### Event Log
 
@@ -245,6 +246,30 @@ content: >-
   {% else %}
   No entries
   {% endif %}
+```
+
+### Alarm Panel + SOS Dashboard Card
+
+```yaml
+type: vertical-stack
+cards:
+  - states:
+      - arm_home
+      - arm_away
+      - disarm
+    type: alarm-panel
+    entity: alarm_control_panel.ov_300_alarm
+  - type: button
+    show_name: true
+    show_icon: true
+    entity: button.ov_300_trigger_sos_alarm
+    name: SOS
+    icon: mdi:alarm-light
+    tap_action:
+      action: call-service
+      service: button.press
+      target:
+        entity_id: button.ov_300_trigger_sos_alarm
 ```
 
 ## Troubleshooting
@@ -512,6 +537,30 @@ content: >-
   {% else %}
   Keine Einträge
   {% endif %}
+```
+
+### Alarm-Panel + SOS Dashboard-Karte
+
+```yaml
+type: vertical-stack
+cards:
+  - states:
+      - arm_home
+      - arm_away
+      - disarm
+    type: alarm-panel
+    entity: alarm_control_panel.ov_300_alarm
+  - type: button
+    show_name: true
+    show_icon: true
+    entity: button.ov_300_trigger_sos_alarm
+    name: SOS
+    icon: mdi:alarm-light
+    tap_action:
+      action: call-service
+      service: button.press
+      target:
+        entity_id: button.ov_300_trigger_sos_alarm
 ```
 
 ## Fehlerbehebung

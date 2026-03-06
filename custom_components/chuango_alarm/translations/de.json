@@ -98,6 +98,9 @@
     "button": {
       "refresh_accessories": {
         "name": "Zubehör aktualisieren"
+      },
+      "sos_alarm": {
+        "name": "SOS-Alarm"
       }
     },
     "event": {

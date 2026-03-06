@@ -98,6 +98,9 @@
     "button": {
       "refresh_accessories": {
         "name": "刷新配件"
+      },
+      "sos_alarm": {
+        "name": "SOS 报警"
       }
     },
     "event": {

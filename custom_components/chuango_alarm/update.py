@@ -25,6 +25,12 @@ from .coordinator import DreamcatcherCoordinator
 from .utils import resolve_device_model
 
 
+FIRMWARE_UPDATE_ADVISORY_EN = "Recommended: perform firmware updates with the DreamCatcher Live app."
+FIRMWARE_UPDATE_ADVISORY_DE = "Empfohlen: Firmware-Updates mit der DreamCatcher Live App durchführen."
+FIRMWARE_UPDATE_ADVISORY_ZH_HANS = "建议：请使用 DreamCatcher Live App 执行固件更新。"
+FIRMWARE_UPDATE_ADVISORY_ZH_HANT = "建議：請使用 DreamCatcher Live App 執行韌體更新。"
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -116,6 +122,18 @@ class ChuangoFirmwareUpdateEntity(
             return fw_list[0]
         return None
 
+    def _localized_update_advisory(self) -> str:
+        """Return localized firmware update advisory based on HA UI language."""
+        lang = str(getattr(getattr(self.hass, "config", None), "language", "") or "en").lower()
+
+        if lang.startswith("de"):
+            return FIRMWARE_UPDATE_ADVISORY_DE
+        if lang in ("zh-hant", "zh-tw", "zh-hk", "zh-mo"):
+            return FIRMWARE_UPDATE_ADVISORY_ZH_HANT
+        if lang.startswith("zh"):
+            return FIRMWARE_UPDATE_ADVISORY_ZH_HANS
+        return FIRMWARE_UPDATE_ADVISORY_EN
+
     # -- device info --
 
     @property
@@ -178,7 +196,9 @@ class ChuangoFirmwareUpdateEntity(
         size = best.get("size")
         if size and int(size) > 0:
             parts.append(f"Size: {size} bytes")
-        return " | ".join(parts) if parts else None
+        advisory = self._localized_update_advisory()
+        parts.append(advisory)
+        return " | ".join(parts) if parts else advisory
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -188,6 +208,8 @@ class ChuangoFirmwareUpdateEntity(
             attrs["fw_count"] = info["fwCount"]
         if info.get("force") is not None:
             attrs["force_update"] = bool(info["force"])
+        attrs["recommended_update_method"] = "DreamCatcher Live app"
+        attrs["advisory"] = self._localized_update_advisory()
         best = self._best_fw
         if best:
             attrs["chipname"] = best.get("chipname")

@@ -31,11 +31,13 @@ from .const import (
     DOCS_URL,
     PARTS_SYNC_COOLDOWN_SECONDS,
 )
+from .utils import alarm_source_type_label, derive_alarm_origin
 
 _REFRESH_BEFORE_SECONDS = 12 * 60 * 60  # 12h
 _DIN_DUP_WINDOW_SECONDS = 0.5
 _DIN_ECHO_WINDOW_SECONDS = 2.0
 _EXT_MODIFY_GRACE_SECONDS = 2.0
+_MAX_IN_MEMORY_ALARM_HISTORY = 100
 
 
 class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -599,6 +601,8 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
             history = list(dev_state.get("alarm_history") or [])
             history.insert(0, live_item)
+            if len(history) > _MAX_IN_MEMORY_ALARM_HISTORY:
+                history = history[:_MAX_IN_MEMORY_ALARM_HISTORY]
             dev_state["alarm_history"] = history
             dev_state["alarm_history_total"] = dev_state.get("alarm_history_total", len(history)) + 1
 
@@ -608,6 +612,15 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 evt_i = int(evt)
             except Exception:
                 evt_i = None
+
+            source_type = data.get("iT")
+            trigger_type = dev_state.get("trig")
+            alarm_origin = derive_alarm_origin(
+                event_code=evt_i,
+                trigger_type=trigger_type,
+                source_type=source_type,
+            )
+            dev_state["alarm_origin"] = alarm_origin
 
             if evt_i in mode_map:
                 if isinstance(nick, str) and nick.strip():
@@ -619,7 +632,8 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if evt_i in (11, 15, 26):
                 dev_state["triggered_by"] = nick.strip() if isinstance(nick, str) and nick.strip() else None
                 dev_state["triggered_by_id"] = data.get("iI")
-                dev_state["triggered_by_type"] = data.get("iT")
+                dev_state["triggered_by_type"] = source_type
+                dev_state["triggered_by_type_label"] = alarm_source_type_label(source_type)
                 dev_state["triggered_at"] = ts
 
             # Fire dispatcher signal immediately so event entities
@@ -632,6 +646,10 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "nick": nick,
                     "ts": ts,
                     "sn": data.get("sN"),
+                    "source_id": data.get("iI"),
+                    "source_type": source_type,
+                    "source_type_label": alarm_source_type_label(source_type),
+                    "alarm_origin": alarm_origin,
                 },
             )
 
@@ -963,10 +981,17 @@ class DreamcatcherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await mqtt.async_publish(device_id, topic, payload, qos=1, retain=False)
 
     async def async_send_alarm_command(self, device_id: str, command: str, code: str | None = None) -> None:
-        """Send arm/disarm via MQTT using the existing per-device connection."""
+        """Send alarm mode changes via MQTT using the existing per-device connection.
+
+        Supported modes:
+        - d: disarm
+        - a: arm away
+        - h: arm home
+        - s: SOS alarm
+        """
 
         mode = (command or "").lower().strip()
-        if mode not in ("d", "a", "h"):
+        if mode not in ("d", "a", "h", "s"):
             raise HomeAssistantError(f"Unsupported alarm mode: {command}")
 
         usr = str(self.entry.data.get(CONF_EMAIL) or "")

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+- Added SOS trigger support via the alarm control panel and dedicated SOS button
+- Improved alarm origin/source labeling for SOS, keyfob, and app-triggered events
+- Improved entity icons and update advisory localization
+
 ## 0.5.1
 
 - Added Chinese translations (`zh-Hans`, `zh-Hant`) for the integration

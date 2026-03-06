@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import DreamcatcherCoordinator
-from .utils import resolve_device_model
+from .utils import alarm_source_type_label, host_mode_label, resolve_device_model
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
     coordinator: DreamcatcherCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
@@ -138,8 +138,10 @@ class DreamcatcherAlarmPanel(CoordinatorEntity[DreamcatcherCoordinator], AlarmCo
             "online": st.get("online"),
             "online_msg": st.get("online_msg"),
             "mode": st.get("mode"),
+            "mode_label": host_mode_label(st.get("mode")),
             "alarm": st.get("alarm"),
             "trig": st.get("trig"),
+            "trig_label": alarm_source_type_label(st.get("trig")),
             "power": st.get("power"),
             "device_time": st.get("time"),
             "last_seen": st.get("last_seen"),
@@ -148,9 +150,11 @@ class DreamcatcherAlarmPanel(CoordinatorEntity[DreamcatcherCoordinator], AlarmCo
             "ip_local": st.get("ip_local"),
             "last_topic": st.get("last_topic"),
             "changed_by": st.get("changed_by"),
+            "alarm_origin": st.get("alarm_origin"),
             "triggered_by": st.get("triggered_by"),
             "triggered_by_id": st.get("triggered_by_id"),
             "triggered_by_type": st.get("triggered_by_type"),
+            "triggered_by_type_label": st.get("triggered_by_type_label"),
             "triggered_at": st.get("triggered_at"),
             "alarm_evt_code": st.get("alarm_evt_code"),
             "alarm_evt_nick": st.get("alarm_evt_nick"),
@@ -169,3 +173,7 @@ class DreamcatcherAlarmPanel(CoordinatorEntity[DreamcatcherCoordinator], AlarmCo
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         #await self.coordinator.async_send_alarm_command(self.device_id, "d", code=code)
         await self.coordinator.async_send_alarm_command(self.device_id, "d")
+
+    async def async_alarm_trigger(self, code: str | None = None) -> None:
+        """Trigger SOS alarm from Home Assistant."""
+        await self.coordinator.async_send_alarm_command(self.device_id, "s")

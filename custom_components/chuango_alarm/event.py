@@ -105,6 +105,8 @@ class ChuangoAlarmEvent(
         self._attr_unique_id = f"{entry.entry_id}_{device_id}_alarm_event"
         self._last_sn: int | None = None
         self._history_initial_fired: bool = False
+        self._history_cache_key: tuple[int, int, Any, Any] | None = None
+        self._history_cache_value: dict[str, Any] | None = None
 
     # ---- device linkage ----
 
@@ -139,6 +141,14 @@ class ChuangoAlarmEvent(
         if not isinstance(history, list):
             return {"history_total": 0}
 
+        total = st.get("alarm_history_total", len(history))
+        first_item = history[0] if history else None
+        first_time = first_item.get("time") if isinstance(first_item, dict) else None
+        first_event = first_item.get("itemEvent") if isinstance(first_item, dict) else None
+        cache_key = (len(history), int(total) if isinstance(total, int) else len(history), first_time, first_event)
+        if self._history_cache_key == cache_key and self._history_cache_value is not None:
+            return self._history_cache_value
+
         formatted: list[dict[str, Any]] = []
         for item in history[:50]:
             evt_code = item.get("itemEvent")
@@ -154,10 +164,13 @@ class ChuangoAlarmEvent(
                     "time": item.get("time"),
                 }
             )
-        return {
+        result = {
             "history": formatted,
-            "history_total": st.get("alarm_history_total", len(history)),
+            "history_total": total,
         }
+        self._history_cache_key = cache_key
+        self._history_cache_value = result
+        return result
 
     # ---- lifecycle ----
 
@@ -201,6 +214,10 @@ class ChuangoAlarmEvent(
                     "name": event_data.get("nick", ""),
                     "event_code": evt_i,
                     "timestamp": event_data.get("ts"),
+                    "source_id": event_data.get("source_id"),
+                    "source_type": event_data.get("source_type"),
+                    "source_type_label": event_data.get("source_type_label"),
+                    "alarm_origin": event_data.get("alarm_origin"),
                 },
             )
             self._history_initial_fired = True

@@ -98,6 +98,9 @@
     "button": {
       "refresh_accessories": {
         "name": "重新整理配件"
+      },
+      "sos_alarm": {
+        "name": "SOS 警報"
       }
     },
     "event": {

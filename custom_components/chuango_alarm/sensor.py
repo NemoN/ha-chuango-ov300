@@ -75,6 +75,12 @@ DTYPE_LABELS: dict[str, str] = {
     "SA": "Security Alarm",
 }
 
+DEV_DIAG_ICONS: dict[str, str] = {
+    "dtype": "mdi:devices",
+    "product_id": "mdi:barcode",
+    "dev_id_int": "mdi:identifier",
+}
+
 _REFRESH_BEFORE_SECONDS = 12 * 60 * 60  # 12h
 
 
@@ -436,6 +442,7 @@ class DreamcatcherDeviceDiagSensor(CoordinatorEntity[DreamcatcherCoordinator], S
         self._def = definition
         self._attr_unique_id = f"{entry.entry_id}_{device_id}_{definition.key}"
         self._attr_name = definition.name
+        self._attr_icon = DEV_DIAG_ICONS.get(definition.key, "mdi:information-outline")
 
     @property
     def _dev(self) -> dict[str, Any]:

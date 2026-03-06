@@ -24,8 +24,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     entities: list[ButtonEntity] = []
 
     for dev_id in coordinator.get_device_ids():
-        known.add(dev_id)
+        known.add(f"{dev_id}_refresh")
+        known.add(f"{dev_id}_sos")
         entities.append(RefreshAccessoriesButton(coordinator, entry, dev_id))
+        entities.append(SosAlarmButton(coordinator, entry, dev_id))
 
     async_add_entities(entities)
 
@@ -34,9 +36,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     @callback
     def _on_update() -> None:
         now_ids = set(coordinator.get_device_ids())
-        new = [RefreshAccessoriesButton(coordinator, entry, dev_id) for dev_id in now_ids if dev_id not in known]
-        for e in new:
-            known.add(e.device_id)
+        new: list[ButtonEntity] = []
+        for dev_id in now_ids:
+            refresh_key = f"{dev_id}_refresh"
+            sos_key = f"{dev_id}_sos"
+            if refresh_key not in known:
+                known.add(refresh_key)
+                new.append(RefreshAccessoriesButton(coordinator, entry, dev_id))
+            if sos_key not in known:
+                known.add(sos_key)
+                new.append(SosAlarmButton(coordinator, entry, dev_id))
         if new:
             hass.async_create_task(platform.async_add_entities(new))
 
@@ -90,3 +99,18 @@ class RefreshAccessoriesButton(CoordinatorEntity[DreamcatcherCoordinator], Butto
     async def async_press(self) -> None:
         """Request fresh parts list from device."""
         await self.coordinator.async_request_parts_list(self.device_id, page=1)
+
+
+class SosAlarmButton(RefreshAccessoriesButton):
+    """Button to trigger SOS alarm from Home Assistant."""
+
+    _attr_translation_key = "sos_alarm"
+    _attr_icon = "mdi:alarm-light"
+
+    def __init__(self, coordinator: DreamcatcherCoordinator, entry: ConfigEntry, device_id: str) -> None:
+        super().__init__(coordinator, entry, device_id)
+        self._attr_unique_id = f"{entry.entry_id}_{device_id}_sos_alarm"
+
+    async def async_press(self) -> None:
+        """Trigger SOS alarm on the device."""
+        await self.coordinator.async_send_alarm_command(self.device_id, "s")

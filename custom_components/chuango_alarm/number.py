@@ -97,7 +97,7 @@ class _BaseDelayNumber(CoordinatorEntity[DreamcatcherCoordinator], NumberEntity)
 
 class EntryDelayNumber(_BaseDelayNumber):
     _attr_translation_key = "entry_delay"
-    _attr_icon = "mdi:timer-arrow-down"
+    _attr_icon = "mdi:timer-alert-outline"
 
     def __init__(self, coordinator: DreamcatcherCoordinator, entry: ConfigEntry, device_id: str) -> None:
         super().__init__(coordinator, entry, device_id)
@@ -119,7 +119,7 @@ class EntryDelayNumber(_BaseDelayNumber):
 
 class ExitDelayNumber(_BaseDelayNumber):
     _attr_translation_key = "exit_delay"
-    _attr_icon = "mdi:timer-arrow-up"
+    _attr_icon = "mdi:timer-play-outline"
 
     def __init__(self, coordinator: DreamcatcherCoordinator, entry: ConfigEntry, device_id: str) -> None:
         super().__init__(coordinator, entry, device_id)
