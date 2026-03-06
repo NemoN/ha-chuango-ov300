@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.3
+
+- Fixed part renames from the app so updated sensor/keyfob names propagate correctly in Home Assistant
+- Improved SOS button naming and Lovelace example configuration
+- Refined performance for event history state handling
+
 ## 0.5.2
 
 - Added SOS trigger support via the alarm control panel and dedicated SOS button

@@ -8,6 +8,7 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -212,24 +213,53 @@ class ChuangoAccessorySensor(CoordinatorEntity[DreamcatcherCoordinator], BinaryS
         self._entry = entry
         self._device_id = device_id
         self._part_id = part.get("id")
-        self._part_name = part.get("n") or f"Sensor {self._part_id}"
         self._part = dict(part)
 
         self._attr_unique_id = f"{entry.entry_id}_{device_id}_part_{self._part_id}"
-        self._attr_name = self._part_name
         self._attr_device_class = _infer_device_class(part)
+
+    @property
+    def _live_part(self) -> dict[str, Any]:
+        parts = self._st.get("parts") or []
+        if isinstance(parts, list):
+            for part in parts:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("id") == self._part_id:
+                    return part
+        return self._part
+
+    @property
+    def name(self) -> str | None:
+        part = self._live_part
+        return part.get("n") or f"Sensor {self._part_id}"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        part = self._live_part
+        self._part = dict(part)
+        self._attr_device_class = _infer_device_class(part)
+
+        new_name = part.get("n") or f"Sensor {self._part_id}"
+        device_registry = dr.async_get(self.hass)
+        device = device_registry.async_get_device(
+            identifiers={(DOMAIN, f"{self._device_id}_part_{self._part_id}")}
+        )
+        if device is not None and device.name_by_user is None and device.name != new_name:
+            device_registry.async_update_device(device.id, name=new_name)
+
+        self.async_write_ha_state()
 
     @property
     def device_info(self) -> DeviceInfo:
         """Register as sub-device of the alarm panel."""
-        d = (self.coordinator.data or {}).get("shared_devices", {}).get(self._device_id, {})
-        alias = d.get("alias") or self._device_id
+        part = self._live_part
 
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_part_{self._part_id}")},
-            name=self._part_name,
+            name=part.get("n") or f"Sensor {self._part_id}",
             manufacturer="Chuango",
-            model=_model_from_part(self._part),
+            model=_model_from_part(part),
             via_device=(DOMAIN, self._device_id),
         )
 
@@ -253,10 +283,11 @@ class ChuangoAccessorySensor(CoordinatorEntity[DreamcatcherCoordinator], BinaryS
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        mtype, mstatus, enabled = _decode_part_c(self._part)
-        t_raw = self._part.get("t")
-        md_raw = self._part.get("md")
-        z_raw = self._part.get("z")
+        part = self._live_part
+        mtype, mstatus, enabled = _decode_part_c(part)
+        t_raw = part.get("t")
+        md_raw = part.get("md")
+        z_raw = part.get("z")
         try:
             md = int(md_raw) if md_raw is not None else None
         except (TypeError, ValueError):
@@ -266,9 +297,9 @@ class ChuangoAccessorySensor(CoordinatorEntity[DreamcatcherCoordinator], BinaryS
         except (TypeError, ValueError):
             zone = None
         return {
-            "part_id": self._part.get("id"),
-            "sensor_index": self._part.get("si"),
-            "category": self._part.get("c"),
+            "part_id": part.get("id"),
+            "sensor_index": part.get("si"),
+            "category": part.get("c"),
             "mtype": mtype,
             "mstatus": mstatus,
             "enabled": enabled,
@@ -302,20 +333,50 @@ class ChuangoKeyfobSensor(CoordinatorEntity[DreamcatcherCoordinator], BinarySens
         self._entry = entry
         self._device_id = device_id
         self._part_id = part.get("id")
-        self._part_name = part.get("n") or f"Key Fob {self._part_id}"
         self._part = dict(part)
 
         self._attr_unique_id = f"{entry.entry_id}_{device_id}_part_{self._part_id}"
-        self._attr_name = self._part_name
+
+    @property
+    def _live_part(self) -> dict[str, Any]:
+        parts = self._st.get("parts") or []
+        if isinstance(parts, list):
+            for part in parts:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("id") == self._part_id:
+                    return part
+        return self._part
+
+    @property
+    def name(self) -> str | None:
+        part = self._live_part
+        return part.get("n") or f"Key Fob {self._part_id}"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        part = self._live_part
+        self._part = dict(part)
+
+        new_name = part.get("n") or f"Key Fob {self._part_id}"
+        device_registry = dr.async_get(self.hass)
+        device = device_registry.async_get_device(
+            identifiers={(DOMAIN, f"{self._device_id}_part_{self._part_id}")}
+        )
+        if device is not None and device.name_by_user is None and device.name != new_name:
+            device_registry.async_update_device(device.id, name=new_name)
+
+        self.async_write_ha_state()
 
     @property
     def device_info(self) -> DeviceInfo:
         """Register as sub-device of the alarm panel."""
+        part = self._live_part
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_part_{self._part_id}")},
-            name=self._part_name,
+            name=part.get("n") or f"Key Fob {self._part_id}",
             manufacturer="Chuango",
-            model=_model_from_part(self._part),
+            model=_model_from_part(part),
             via_device=(DOMAIN, self._device_id),
         )
 
@@ -335,7 +396,7 @@ class ChuangoKeyfobSensor(CoordinatorEntity[DreamcatcherCoordinator], BinarySens
     @property
     def is_on(self) -> bool | None:
         """Key fob presence: ss=0 means active/present."""
-        ss = self._part.get("ss")
+        ss = self._live_part.get("ss")
         if ss is None:
             return None
         try:
@@ -345,10 +406,11 @@ class ChuangoKeyfobSensor(CoordinatorEntity[DreamcatcherCoordinator], BinarySens
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        mtype, mstatus, enabled = _decode_part_c(self._part)
-        t_raw = self._part.get("t")
-        md_raw = self._part.get("md")
-        z_raw = self._part.get("z")
+        part = self._live_part
+        mtype, mstatus, enabled = _decode_part_c(part)
+        t_raw = part.get("t")
+        md_raw = part.get("md")
+        z_raw = part.get("z")
         try:
             md = int(md_raw) if md_raw is not None else None
         except (TypeError, ValueError):
@@ -358,15 +420,15 @@ class ChuangoKeyfobSensor(CoordinatorEntity[DreamcatcherCoordinator], BinarySens
         except (TypeError, ValueError):
             zone = None
         return {
-            "part_id": self._part.get("id"),
-            "sensor_index": self._part.get("si"),
-            "category": self._part.get("c"),
+            "part_id": part.get("id"),
+            "sensor_index": part.get("si"),
+            "category": part.get("c"),
             "mtype": mtype,
             "mstatus": mstatus,
             "enabled": enabled,
             "type": t_raw,
             "type_label": _part_t_label(t_raw),
-            "status": self._part.get("ss"),
+            "status": part.get("ss"),
             "mode": md_raw,
             "mode_label": part_md_label(md),
             "zone": z_raw,
