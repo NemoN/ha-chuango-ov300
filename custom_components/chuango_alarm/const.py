@@ -10,6 +10,12 @@ ZONE_PATH = "/v2/server/zone"
 # API paths (resolved via zone 'am' endpoint)
 LOGIN_PATH = "/v2/user/login"
 SHARED_DEVICES_PATH = "/v2/user/device/list/shared"
+DEVICE_LIST_PATHS = [
+    "/v2/user/device/list/shared",
+    "/v2/user/device/list",
+    "/v2/user/device/list/all",
+    "/v2/home/device/list",
+]
 ALARM_HISTORY_PATH = "/v2/message/list/alarm/device"
 FWINFO_PATH = "/v2/user/device/fwinfo"
 

@@ -18,9 +18,9 @@ from .const import (
     DEFAULT_OS_VER,
     DEFAULT_PHONE_BRAND,
     DEFAULT_USER_AGENT,
+    DEVICE_LIST_PATHS,
     FWINFO_PATH,
     LOGIN_PATH,
-    SHARED_DEVICES_PATH,
     ZONE_API_BASE,
     ZONE_PATH,
 )
@@ -62,15 +62,10 @@ class DreamcatcherApiClient:
         self._session = session
         self._log = logger
 
-    async def get_zone(
-            self,
-            region: str,
-    ) -> ZoneResult:
+    async def get_zone(self, region: str) -> ZoneResult:
         url = f"{ZONE_API_BASE}{ZONE_PATH}"
 
-        params = {
-            "region": region
-        }
+        params = {"region": region}
 
         headers = {
             "Appversion": DEFAULT_APP_VER,
@@ -110,7 +105,9 @@ class DreamcatcherApiClient:
                 )
 
             if resp.status != 200:
-                raise DreamcatcherApiError(f"Zone HTTP {resp.status}: {truncate(body_text, 300)}")
+                raise DreamcatcherApiError(
+                    f"Zone HTTP {resp.status}: {truncate(body_text, 300)}"
+                )
 
             try:
                 data = json.loads(body_text)
@@ -133,7 +130,9 @@ class DreamcatcherApiClient:
                 mqtt_port=int(mqtt["port"]),
             )
         except Exception as err:
-            raise DreamcatcherApiError(f"Unexpected zone response shape: {truncate(pretty_json(data), 800)}") from err
+            raise DreamcatcherApiError(
+                f"Unexpected zone response shape: {truncate(pretty_json(data), 800)}"
+            ) from err
 
     async def login(
         self,
@@ -198,37 +197,40 @@ class DreamcatcherApiClient:
                 )
 
             if resp.status in (401, 403):
-                raise DreamcatcherAuthError(f"Auth failed ({resp.status}): {truncate(body_text, 300)}")
+                raise DreamcatcherAuthError(
+                    f"Auth failed ({resp.status}): {truncate(body_text, 300)}"
+                )
 
             if resp.status != 200:
-                raise DreamcatcherApiError(f"HTTP {resp.status}: {truncate(body_text, 300)}")
+                raise DreamcatcherApiError(
+                    f"HTTP {resp.status}: {truncate(body_text, 300)}"
+                )
 
             try:
                 data = json.loads(body_text)
             except Exception as err:
-                raise DreamcatcherApiError(f"Invalid JSON: {err} | body={truncate(body_text, 300)}") from err
+                raise DreamcatcherApiError(
+                    f"Invalid JSON: {err} | body={truncate(body_text, 300)}"
+                ) from err
 
         token = data.get("token")
         expire_at = data.get("expireAt")
         user_info = data.get("userInfo")
 
         if not token or not expire_at or not isinstance(user_info, dict):
-            raise DreamcatcherApiError(f"Unexpected login response shape: {truncate(pretty_json(data), 500)}")
+            raise DreamcatcherApiError(
+                f"Unexpected login response shape: {truncate(pretty_json(data), 500)}"
+            )
 
         return LoginResult(token=token, expire_at=int(expire_at), user_info=user_info)
-    
-    async def shared_devices(
-            self,
-            *,
-            am_domain: str,
-            am_port: int,
-            token: str
-    ) -> list[dict[str, Any]]:
-        url = f"https://{am_domain}:{am_port}{SHARED_DEVICES_PATH}"
-        params = {
-            "token": token
-        }
 
+    async def shared_devices(
+        self,
+        *,
+        am_domain: str,
+        am_port: int,
+        token: str,
+    ) -> list[dict[str, Any]]:
         headers = {
             "Appversion": DEFAULT_APP_VER,
             "Platform": DEFAULT_OS,
@@ -237,123 +239,101 @@ class DreamcatcherApiClient:
             "User-Agent": DEFAULT_USER_AGENT,
         }
 
-        if self._log.isEnabledFor(logging.DEBUG):
-            self._log.debug(
-                "HTTP REQUEST %s %s\nparams=%s\nheaders=%s",
-                "GET",
-                url,
-                pretty_json(redact_mapping(params)),
-                pretty_json(redact_headers(headers)),
-            )
+        params = {"token": token}
+        last_data: dict[str, Any] | None = None
 
-        try:
-            async with asyncio.timeout(20):
-                resp = await self._session.get(url, params=params, headers=headers)
-        except (aiohttp.ClientError, TimeoutError) as err:
-            raise DreamcatcherApiError(f"Connection error: {err}") from err
-
-        async with resp:
-            body_bytes = await resp.read()
-            body_text = body_bytes.decode("utf-8", errors="replace")
+        for path in DEVICE_LIST_PATHS:
+            url = f"https://{am_domain}:{am_port}{path}"
 
             if self._log.isEnabledFor(logging.DEBUG):
                 self._log.debug(
-                    "HTTP RESPONSE %s %s\nstatus=%s\nresp_headers=%s\nbody=%s",
+                    "HTTP REQUEST %s %s\nparams=%s\nheaders=%s",
                     "GET",
-                    str(resp.url),
-                    resp.status,
-                    pretty_json(redact_headers(dict(resp.headers))),
-                    truncate(body_text),
+                    url,
+                    pretty_json(redact_mapping(params)),
+                    pretty_json(redact_headers(headers)),
                 )
 
-            if resp.status in (401, 403):
-                raise DreamcatcherAuthError(f"Auth failed ({resp.status}): {truncate(body_text, 300)}")
-            
-            if resp.status != 200:
-                raise DreamcatcherApiError(f"HTTP {resp.status}: {truncate(body_text, 300)}")
-
             try:
-                data = json.loads(body_text)
-            except Exception as err:
-                raise DreamcatcherApiError(f"Invalid JSON: {err} | body={truncate(body_text, 300)}") from err
+                async with asyncio.timeout(20):
+                    resp = await self._session.get(url, params=params, headers=headers)
+            except (aiohttp.ClientError, TimeoutError):
+                continue
 
-        # Some accounts (or server variants) return an empty object instead of {"list": []}.
-        # Treat that as "no shared devices" so the config flow can show a helpful message.
-        if isinstance(data, dict) and not data:
+            async with resp:
+                body_bytes = await resp.read()
+                body_text = body_bytes.decode("utf-8", errors="replace")
+
+                if self._log.isEnabledFor(logging.DEBUG):
+                    self._log.debug(
+                        "HTTP RESPONSE %s %s\nstatus=%s\nresp_headers=%s\nbody=%s",
+                        "GET",
+                        str(resp.url),
+                        resp.status,
+                        pretty_json(redact_headers(dict(resp.headers))),
+                        truncate(body_text),
+                    )
+
+                if resp.status in (401, 403):
+                    raise DreamcatcherAuthError(
+                        f"Auth failed ({resp.status}): {truncate(body_text, 300)}"
+                    )
+
+                if resp.status != 200:
+                    continue
+
+                try:
+                    data = json.loads(body_text)
+                except Exception:
+                    continue
+
+                if not isinstance(data, dict):
+                    continue
+
+                last_data = data
+
+                if isinstance(data.get("list"), list) and data["list"]:
+                    break
+
+        data = last_data or {}
+
+        if not data:
             return []
 
-        if not isinstance(data, dict) or "list" not in data or not isinstance(data["list"], list):
+        if "list" not in data:
             raise DreamcatcherApiError(
-                f"Unexpected shared devices response shape: {truncate(pretty_json(data), 500)}"
+                f"Unexpected devices response shape: {truncate(pretty_json(data), 500)}"
             )
 
-        """ {
-            "list": [
-                {
-                    "devIdInt": 110858,
-                    "ID": "00001900000244212033",
-                    "product_id": "19",
-                    "dtype": "SA",
-                    "mpid": "19",
-                    "alias": "OV-300",
-                    "userAuth": "general",
-                    "mqtt": {
-                        "domain": "psb1.iotdreamcatcher.net",
-                        "ip": "52.28.65.29",
-                        "port": 18883,
-                        "token": "9ZalSwg5Xx44VA05gLdszjVvQM1RUQDbO_3920dr8K8"
-                    },
-                    "forceUpdate": 0,
-                    "p2p": {
-                        "domain": "psb1.iotdreamcatcher.net",
-                        "ip": "52.28.65.29",
-                        "port": 10005
-                    },
-                    "dm": {
-                        "domain": "psb1.iotdreamcatcher.net",
-                        "ip": "52.28.65.29",
-                        "port": 12443
-                    },
-                    "homeID": 0,
-                    "roomID": 0,
-                    "roomName": "",
-                    "pushEn": 1,
-                    "wxPushEn": 1,
-                    "hmodePushEn": 1,
-                    "tempPushEn": 1,
-                    "humPushEn": 1,
-                    "illumPushEn": 1,
-                    "smokeSoundPushEn": 1,
-                    "pirPushEn": 1,
-                    "soundSrc": "",
-                    "utype": 0,
-                    "ble": {},
-                    "parentId": ""
-                }
-            ]
-        }
-        """
+        if not isinstance(data["list"], list):
+            raise DreamcatcherApiError(
+                f"Unexpected devices list response shape: {truncate(pretty_json(data), 500)}"
+            )
 
         items = data["list"]
         shared_devices: list[dict[str, Any]] = []
+
         for sd in items:
             if not isinstance(sd, dict):
                 continue
-            shared_devices.append({
-                "ID": sd.get("ID"),
-                "devIdInt": sd.get("devIdInt"),
-                "product_id": sd.get("product_id"),
-                "dtype": sd.get("dtype"),
-                "mpid": sd.get("mpid"),
-                "alias": sd.get("alias"),
-                "userAuth": sd.get("userAuth"),
-                "mqtt": sd.get("mqtt") or {},
-                "dm": sd.get("dm") or {},
-                "p2p": sd.get("p2p") or {},
-                "homeID": sd.get("homeID"),
-                "roomID": sd.get("roomID"),
-                "roomName": sd.get("roomName") or "",
-            })
+
+            shared_devices.append(
+                {
+                    "ID": sd.get("ID"),
+                    "devIdInt": sd.get("devIdInt"),
+                    "product_id": sd.get("product_id"),
+                    "dtype": sd.get("dtype"),
+                    "mpid": sd.get("mpid"),
+                    "alias": sd.get("alias"),
+                    "userAuth": sd.get("userAuth"),
+                    "mqtt": sd.get("mqtt") or {},
+                    "dm": sd.get("dm") or {},
+                    "p2p": sd.get("p2p") or {},
+                    "homeID": sd.get("homeID"),
+                    "roomID": sd.get("roomID"),
+                    "roomName": sd.get("roomName") or "",
+                }
+            )
 
         return shared_devices
 
@@ -366,7 +346,6 @@ class DreamcatcherApiClient:
         offset: int = 0,
         page_size: int = 50,
     ) -> dict[str, Any]:
-        """Fetch alarm event history for a device via REST API (POST)."""
         url = f"{base_url}{ALARM_HISTORY_PATH}"
         params = {"token": token}
         body = {
@@ -416,10 +395,14 @@ class DreamcatcherApiClient:
                 )
 
             if resp.status in (401, 403):
-                raise DreamcatcherAuthError(f"Auth failed ({resp.status}): {truncate(body_text, 300)}")
+                raise DreamcatcherAuthError(
+                    f"Auth failed ({resp.status}): {truncate(body_text, 300)}"
+                )
 
             if resp.status != 200:
-                raise DreamcatcherApiError(f"HTTP {resp.status}: {truncate(body_text, 300)}")
+                raise DreamcatcherApiError(
+                    f"HTTP {resp.status}: {truncate(body_text, 300)}"
+                )
 
             try:
                 data = json.loads(body_text)
@@ -446,12 +429,6 @@ class DreamcatcherApiClient:
         gsm_version: str = "",
         gsm_model: str = "",
     ) -> dict[str, Any]:
-        """Check for firmware updates via the fwinfo REST endpoint.
-
-        GET /v2/user/device/fwinfo?token=...&deviceID=...&wifi=...&mcu&g_v&g_m
-
-        Returns the raw JSON dict with keys: code, fwCount, force, appForce, fwList.
-        """
         url = f"{base_url}{FWINFO_PATH}"
         params: dict[str, str] = {
             "token": token,
@@ -500,10 +477,14 @@ class DreamcatcherApiClient:
                 )
 
             if resp.status in (401, 403):
-                raise DreamcatcherAuthError(f"Auth failed ({resp.status}): {truncate(body_text, 300)}")
+                raise DreamcatcherAuthError(
+                    f"Auth failed ({resp.status}): {truncate(body_text, 300)}"
+                )
 
             if resp.status != 200:
-                raise DreamcatcherApiError(f"HTTP {resp.status}: {truncate(body_text, 300)}")
+                raise DreamcatcherApiError(
+                    f"HTTP {resp.status}: {truncate(body_text, 300)}"
+                )
 
             try:
                 data = json.loads(body_text)
