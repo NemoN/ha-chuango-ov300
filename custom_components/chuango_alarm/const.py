@@ -11,7 +11,7 @@ ZONE_PATH = "/v2/server/zone"
 LOGIN_PATH = "/v2/user/login"
 SHARED_DEVICES_PATH = "/v2/user/device/list/shared"
 DEVICE_LIST_PATHS = [
-    "/v2/user/device/list/shared",
+    SHARED_DEVICES_PATH,
     "/v2/user/device/list",
     "/v2/user/device/list/all",
     "/v2/home/device/list",

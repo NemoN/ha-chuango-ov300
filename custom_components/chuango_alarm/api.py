@@ -240,7 +240,8 @@ class DreamcatcherApiClient:
         }
 
         params = {"token": token}
-        last_data: dict[str, Any] | None = None
+        empty_response = False
+        last_error: DreamcatcherApiError | None = None
 
         for path in DEVICE_LIST_PATHS:
             url = f"https://{am_domain}:{am_port}{path}"
@@ -257,11 +258,16 @@ class DreamcatcherApiClient:
             try:
                 async with asyncio.timeout(20):
                     resp = await self._session.get(url, params=params, headers=headers)
-            except (aiohttp.ClientError, TimeoutError):
+            except (aiohttp.ClientError, TimeoutError) as err:
+                last_error = DreamcatcherApiError(f"Device list connection error: {err}")
                 continue
 
             async with resp:
-                body_bytes = await resp.read()
+                try:
+                    body_bytes = await resp.read()
+                except (aiohttp.ClientError, TimeoutError) as err:
+                    last_error = DreamcatcherApiError(f"Device list response error: {err}")
+                    continue
                 body_text = body_bytes.decode("utf-8", errors="replace")
 
                 if self._log.isEnabledFor(logging.DEBUG):
@@ -274,41 +280,39 @@ class DreamcatcherApiClient:
                         truncate(body_text),
                     )
 
-                if resp.status in (401, 403):
+                if resp.status == 401 or (resp.status == 403 and path == DEVICE_LIST_PATHS[0]):
                     raise DreamcatcherAuthError(
                         f"Auth failed ({resp.status}): {truncate(body_text, 300)}"
                     )
 
+                if resp.status in (403, 404, 405):
+                    continue
+
                 if resp.status != 200:
+                    last_error = DreamcatcherApiError(f"Device list HTTP {resp.status} at {path}")
                     continue
 
                 try:
                     data = json.loads(body_text)
-                except Exception:
+                except (ValueError, TypeError) as err:
+                    last_error = DreamcatcherApiError(f"Invalid device list JSON at {path}: {err}")
                     continue
 
-                if not isinstance(data, dict):
+                if data == {} or (isinstance(data, dict) and data.get("list") == []):
+                    empty_response = True
                     continue
 
-                last_data = data
+                if not isinstance(data, dict) or not isinstance(data.get("list"), list):
+                    last_error = DreamcatcherApiError(f"Unexpected device list response at {path}")
+                    continue
 
-                if isinstance(data.get("list"), list) and data["list"]:
-                    break
-
-        data = last_data or {}
-
-        if not data:
-            return []
-
-        if "list" not in data:
-            raise DreamcatcherApiError(
-                f"Unexpected devices response shape: {truncate(pretty_json(data), 500)}"
-            )
-
-        if not isinstance(data["list"], list):
-            raise DreamcatcherApiError(
-                f"Unexpected devices list response shape: {truncate(pretty_json(data), 500)}"
-            )
+                break
+        else:
+            if last_error is not None:
+                raise last_error
+            if empty_response:
+                return []
+            raise DreamcatcherApiError("No supported device list endpoint responded")
 
         items = data["list"]
         shared_devices: list[dict[str, Any]] = []
