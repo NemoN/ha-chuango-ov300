@@ -31,7 +31,7 @@ Home Assistant integration for **Chuango OV-300** WiFi alarm systems via the Dre
 | Model | Status |
 |-------|--------|
 | [OV-300](https://chuango.de/en/products/smart-wifi-alarm-system-ov-300) | Tested |
-| [LTE-400](https://chuango.de/en/products/wifi-4g-alarm-system-lte-400) | Untested |
+| [LTE-400](https://chuango.de/en/products/wifi-4g-alarm-system-lte-400) | Tested |
 
 ### Product IDs
 
@@ -52,7 +52,7 @@ If you use a different Chuango model, please open an issue and share your model 
 
 ## Requirements
 
-- A Chuango OV-300 alarm system
+- A Chuango OV-300 or LTE-400 alarm system
 - An account in the **DreamCatcher Live** app ([Android](https://play.google.com/store/apps/details?id=com.dc.dreamcatcherlife) / [iOS](https://apps.apple.com/de/app/dreamcatcher-life/id1507718806))
 - Home Assistant 2024.1 or newer
 
@@ -354,7 +354,7 @@ Home Assistant Integration für **Chuango OV-300** WLAN-Alarmanlagen über den D
 | Modell | Status |
 |--------|--------|
 | [OV-300](https://chuango.de/products/smart-wifi-alarm-system-ov-300) | Getestet |
-| [LTE-400](https://chuango.de/products/wifi-4g-alarm-system-lte-400) | Ungetestet |
+| [LTE-400](https://chuango.de/products/wifi-4g-alarm-system-lte-400) | Getestet |
 
 ### Produkt-IDs
 
@@ -375,7 +375,7 @@ Wenn du ein anderes Chuango-Modell nutzt, erstelle bitte ein Issue mit Modellnam
 
 ## Voraussetzungen
 
-- Eine Chuango OV-300 Alarmanlage
+- Eine Chuango OV-300 oder LTE-400 Alarmanlage
 - Ein Konto in der **DreamCatcher Live** App ([Android](https://play.google.com/store/apps/details?id=com.dc.dreamcatcherlife) / [iOS](https://apps.apple.com/de/app/dreamcatcher-life/id1507718806))
 - Home Assistant 2024.1 oder neuer
 
